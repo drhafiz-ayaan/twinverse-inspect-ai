@@ -123,24 +123,23 @@ Verified on the development machine **2026-08-30**. The [setup guide below](#env
 | FastAPI / SQLAlchemy / Alembic | ✅ 0.141.1 / 2.0.52 / 1.19.1 |
 | boto3 / ReportLab / pydantic-settings | ✅ installed |
 | Dependency pinning | ✅ [`requirements.txt`](requirements.txt) — direct deps pinned, dry-run verified against this environment |
-| Docker **group membership** | ❌ user not in `docker` group — socket returns permission denied |
-| Node.js | ❌ not installed |
+| Docker group membership | ✅ `ak` in `docker` group |
+| Node.js | ✅ v20.20.2 / npm 10.8.2 (via nvm) |
+| PostgreSQL container | ✅ `twinverse-pg` — Postgres 16.15, `twinverse` DB, port 5432 |
+| MinIO container | ✅ `twinverse-minio` — health 200, console 9001, bucket `twinverse-inspections` |
+| DB + storage from Python | ✅ verified end to end via SQLAlchemy/psycopg2 and boto3 |
 | GPU mode (`prime-select`) | `on-demand` — switch to `nvidia` before training runs |
 | GPU power cap | 80 W reported by `nvidia-smi`. Low for a GS66 3080; check the MSI power/thermal profile before benchmarking Phase 2 training throughput. |
 
 ### Remaining setup
 
-```bash
-sudo usermod -aG docker $USER
-```
+**None — Phase 0 environment is complete.** Node was installed via **nvm** rather than the NodeSource method in step 4 below; it needs no root and avoids running a remote script under `sudo`.
 
-Log out and back in afterward for the group change to apply.
+One gotcha worth remembering: after `sudo usermod -aG docker $USER`, a shell that was already open still fails with a permission-denied socket error, because process credentials are fixed at login. Log out and back in, or prefix commands for the current session only:
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && source ~/.bashrc && nvm install 20 && nvm alias default 20
+sg docker -c "docker ps"
 ```
-
-Node is installed via **nvm** rather than the NodeSource method in step 4 below — it needs no root and avoids running a remote script under `sudo`.
 
 ---
 
@@ -236,13 +235,29 @@ Expected output: `True NVIDIA GeForce RTX 3080 Laptop GPU`
 
 ### 6. Services
 
+> **Local development credentials only.** `devpass` and `minioadmin/minioadmin` are fine on a laptop but must never reach a deployed environment — the proposal's security requirements call for encrypted secrets. Move these to `.env` (already gitignored) before Phase 6.
+
+Both services mount a **named volume**. Without one, `docker rm` destroys the database — the container's writable layer is not persistent storage.
+
 ```bash
-docker run -d --name twinverse-pg -e POSTGRES_PASSWORD=devpass -e POSTGRES_DB=twinverse -p 5432:5432 postgres:16
+docker volume create twinverse_pgdata && docker volume create twinverse_miniodata
 ```
 
 ```bash
-docker run -d --name twinverse-minio -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin quay.io/minio/minio server /data --console-address ":9001"
+docker run -d --name twinverse-pg -e POSTGRES_PASSWORD=devpass -e POSTGRES_DB=twinverse -p 5432:5432 -v twinverse_pgdata:/var/lib/postgresql/data postgres:16
 ```
+
+```bash
+docker run -d --name twinverse-minio -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin -v twinverse_miniodata:/data quay.io/minio/minio server /data --console-address ":9001"
+```
+
+Verify both are serving:
+
+```bash
+docker exec twinverse-pg pg_isready -d twinverse -U postgres && curl -s -o /dev/null -w "minio %{http_code}\n" http://localhost:9000/minio/health/live
+```
+
+MinIO console: <http://localhost:9001> · Postgres DSN: `postgresql+psycopg2://postgres:devpass@localhost:5432/twinverse`
 
 ---
 
