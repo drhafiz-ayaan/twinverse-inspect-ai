@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** Pre-development. Planning complete. Ubuntu 24.04 migration **complete and verified** — see [Environment Status](#environment-status). No application code written yet; Phase 0 scaffold in progress.
+**Status:** **Phase 1 complete.** Environment verified ([Environment Status](#environment-status)); upload API shipped with 22 passing integration tests ([API — Phase 1](#api--phase-1)). Next up is Phase 2, defect detection — the critical path.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -20,6 +20,7 @@
 - [Environment Status](#environment-status)
 - [Environment Setup — Ubuntu 24.04](#environment-setup--ubuntu-2404-noble)
 - [Optional: ROS2 Jazzy + Gazebo Harmonic](#optional-ros2-jazzy--gazebo-harmonic--phase-6-not-mvp)
+- [API — Phase 1](#api--phase-1)
 - [Development Roadmap](#development-roadmap--effort-estimates)
 - [Scope Triage](#scope-triage--what-ships-and-what-does-not)
 - [Severity Scoring Model](#severity-scoring-model)
@@ -277,20 +278,84 @@ source /opt/ros/jazzy/setup.bash
 
 ---
 
+## API — Phase 1
+
+FastAPI service under [`backend/`](backend). Asset and inspection records, plus image and video ingest into S3-compatible storage.
+
+### Run it
+
+```bash
+source .venv/bin/activate && cd backend && alembic upgrade head
+```
+
+```bash
+cd backend && PYTHONPATH=. uvicorn app.main:app --reload --port 8000
+```
+
+Interactive docs at <http://localhost:8000/docs>. Requires the Postgres and MinIO containers from [setup step 6](#6-services).
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Liveness — process is up, touches nothing |
+| `GET` | `/health/ready` | Readiness — pings Postgres and object storage; **503** if either is down |
+| `POST` `GET` | `/api/v1/assets` | Create / list assets (filter by `asset_type`) |
+| `GET` `PATCH` `DELETE` | `/api/v1/assets/{id}` | Fetch, partial update, cascade delete |
+| `POST` `GET` | `/api/v1/inspections` | Create / list inspections (list includes `media_count`) |
+| `GET` `PATCH` `DELETE` | `/api/v1/inspections/{id}` | Fetch, partial update, delete |
+| `GET` | `/api/v1/inspections/{id}/media` | List media with presigned download URLs |
+| `POST` | `/api/v1/inspections/{id}/uploads` | **Multi-file image/video ingest** |
+| `GET` `DELETE` | `/api/v1/media/{id}` | Fetch with download URL / delete row and object |
+
+### Upload behaviour
+
+Uploads are streamed to a temp file in 1 MiB chunks, hashed, probed for metadata, then streamed into the bucket — a 500 MB video is never held in memory. Size limits are enforced against **bytes actually read**, not the client's `Content-Length`.
+
+Each file in a batch succeeds or fails independently, and the response reports both counts:
+
+```json
+{
+  "inspection_id": "…",
+  "accepted_count": 2,
+  "rejected_count": 1,
+  "results": [
+    {"filename": "deck.jpg", "accepted": true,  "media_file": {"…": "…"}},
+    {"filename": "notes.pdf", "accepted": false, "error": "content type 'application/pdf' is not accepted; …"}
+  ]
+}
+```
+
+A batch where *nothing* was accepted returns **400**; a partial success returns **201**.
+
+### Tests
+
+```bash
+cd backend && ../.venv/bin/pytest
+```
+
+22 integration tests against the real Postgres and MinIO — not mocks. They create and drop a `twinverse_test` database and a `twinverse-test` bucket, so development data is never touched. The suite applies the **Alembic migration** rather than `create_all`, so it fails if the migration drifts from the models.
+
+### Configuration
+
+Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and edit. Defaults match the local dev services, so a fresh checkout runs with no `.env` at all. Swapping MinIO for Alibaba Cloud OSS or AWS S3 is a change to `S3_*` values only.
+
+---
+
 ## Development Roadmap & Effort Estimates
 
 Estimates assume a solo developer working with AI pair-programming assistance.
 
-| Phase | Deliverable | Effort |
-|---|---|---|
-| **0** | Ubuntu migration, drivers, toolchain, repo scaffold | 0.5–1 d |
-| **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d |
-| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path |
-| **3** | Severity scoring engine | 0.5 d |
-| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d |
-| **5** | Three.js digital twin viewer with defect markers | 1–2 d |
-| **6** | JWT auth, Docker Compose, CI, documentation | 1 d |
-| **7** | Demo script, pitch deck, recorded walkthrough | 1 d |
+| Phase | Deliverable | Effort | Status |
+|---|---|---|---|
+| **0** | Ubuntu migration, drivers, toolchain, repo scaffold | 0.5–1 d | ✅ done |
+| **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d | ✅ done |
+| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ⬜ next |
+| **3** | Severity scoring engine | 0.5 d | ⬜ |
+| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ |
+| **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ |
+| **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ⬜ |
+| **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ |
 
 **Total: 9–14 focused working days** (~8–10 days full-time, or 2.5–3 weeks part-time).
 
@@ -361,33 +426,40 @@ Recommended focus: **concrete bridge and building defects**. Clear public data, 
 
 ## Planned Repository Structure
 
+Built (✅) versus planned (⬜):
+
 ```
 twinverse-inspect-ai/
-├── backend/              # FastAPI service
+├── backend/                    ✅ FastAPI service
+│   ├── alembic.ini             ✅
+│   ├── pytest.ini              ✅
+│   ├── requirements.txt        ✅ service deps (no CUDA stack)
+│   ├── .env.example            ✅
 │   ├── app/
-│   │   ├── api/          # routers: upload, inspections, detections, reports
-│   │   ├── core/         # config, security, JWT
-│   │   ├── db/           # models, session, migrations
-│   │   └── services/     # inference, severity, storage, reporting
-│   └── tests/
-├── frontend/             # Next.js dashboard + Three.js viewer
-│   ├── app/
-│   ├── components/
-│   └── lib/
-├── ml/                   # model training and evaluation
-│   ├── datasets/         # (gitignored)
-│   ├── notebooks/
-│   ├── train.py
-│   └── weights/          # (gitignored — use Git LFS or GitHub Releases)
-├── infra/
-│   ├── docker-compose.yml
-│   └── .github/workflows/
-├── docs/
-├── requirements.txt      # temporary — see note below
-└── README.md
+│   │   ├── main.py             ✅ app factory, CORS, lifespan
+│   │   ├── api/
+│   │   │   ├── deps.py         ✅ shared 404 lookups
+│   │   │   └── routers/        ✅ health, assets, inspections, uploads
+│   │   │                       ⬜ detections, reports
+│   │   ├── core/               ✅ config          ⬜ security, JWT
+│   │   ├── db/                 ✅ base, models, session, migrations/
+│   │   ├── schemas/            ✅ asset, inspection, media
+│   │   └── services/           ✅ storage, media   ⬜ inference, severity, reporting
+│   └── tests/                  ✅ 22 integration tests
+├── ml/                         ◐ model training and evaluation
+│   ├── requirements.txt        ✅ torch, torchvision, ultralytics
+│   ├── datasets/               ⬜ (gitignored)
+│   ├── notebooks/              ⬜
+│   ├── train.py                ⬜
+│   └── weights/                ⬜ (gitignored — Git LFS or GitHub Releases)
+├── frontend/                   ⬜ Next.js dashboard + Three.js viewer
+├── infra/                      ⬜ docker-compose.yml, .github/workflows/
+├── docs/                       ⬜
+├── requirements.txt            ✅ aggregate of backend + ml, for one dev venv
+└── README.md                   ✅
 ```
 
-**Note on `requirements.txt`:** it currently sits at the repo root because no `backend/` or `ml/` directory exists yet. When the scaffold lands it should move to `backend/requirements.txt`, with the training-only dependencies (`torch`, `torchvision`, `ultralytics`) likely splitting into `ml/requirements.txt` — the API service does not need the full CUDA stack, and keeping them together would bloat the backend Docker image by several GB.
+**On the requirements split:** `backend/requirements.txt` deliberately excludes `torch`, `torchvision` and `ultralytics`. The API service does not run inference in-process, so bundling the CUDA stack would add several GB to its container image for code it never calls. The root `requirements.txt` is a two-line aggregate (`-r backend/…`, `-r ml/…`) so a single development venv still covers everything.
 
 ---
 
@@ -451,6 +523,44 @@ This closes D-002 — the critically outdated Windows driver 471.41 is gone, and
 The original setup step piped a NodeSource script into `sudo -E bash -`. Replaced with nvm: it installs into the user's home directory, requires no root, avoids executing a remote script with superuser rights, and makes Node version switching trivial. Ubuntu's packaged `nodejs` was rejected — Noble ships 18.19, which is end-of-life.
 
 Similarly, the PyTorch `--index-url .../cu124` pin was dropped in favour of the default PyPI wheels, which carry a CUDA runtime matched to the installed 580 driver. Pinning an older runtime than the driver buys nothing here.
+
+### D-007 — Object storage is written before the database row, and rolled back on failure
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+An upload touches two systems that cannot share a transaction. The order chosen is: stream the object into the bucket first, then commit the row; if the commit fails, delete the object.
+
+The failure mode this avoids is a row pointing at an object that was never written — a broken image in the dashboard with no way to tell whether ingest or storage was at fault. The failure mode it accepts is a brief orphaned object if the process dies between the two steps, which is recoverable by a sweep and harms nothing in the meantime.
+
+Related: deleting an **asset** cascades to its rows but deliberately leaves objects in the bucket, so a mistaken delete stays recoverable. Deleting a **single media file** is an explicit act and does reclaim the object.
+
+### D-008 — Batch uploads isolate per-file failures
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+A drone run produces dozens of stills at once. Rejecting an entire batch because one file is a stray PDF would be hostile in exactly the situation the tool exists for. Each file is validated and stored independently, and the response carries `accepted_count`, `rejected_count`, and a per-file result with the reason for each rejection.
+
+A batch where nothing was accepted returns 400; a partial success returns 201. Silently returning 201 for a batch that stored nothing would be the worst option.
+
+### D-009 — Detection schema lands in the first migration; bounding boxes are normalized
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+The `detections` table is created in the Phase 1 migration even though nothing writes to it until Phase 2, so the schema arrives in one reviewable migration rather than being bolted on later.
+
+Bounding boxes are stored **normalized to 0..1** against the source frame rather than in pixels, so they survive resizing and can be overlaid on any rendition — thumbnail, full image, or Three.js marker — without carrying original dimensions around.
+
+The severity *inputs* (`normalized_area`, `class_weight`, `confidence`) are stored alongside `severity_score`, not just the final number. [D-004](#d-004--severity-scoring-is-relative-not-absolute) commits to showing the formula in the UI; that is only honest if the score can be re-derived from stored values rather than taken on trust.
+
+### D-010 — Phase 1 tests run against real Postgres and MinIO, not mocks
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+The entire claim of the upload path is that bytes land in object storage and a row lands in the database. A mocked S3 client would prove neither, so the suite runs against the real local services, creating and dropping a `twinverse_test` database and `twinverse-test` bucket.
+
+The suite also applies the **Alembic migration** rather than `Base.metadata.create_all`, so it fails when the migration drifts from the models — the drift being the thing most likely to break a deployment while every unit test still passes.
+
+Cost: the tests need Docker running. That is an acceptable trade at this stage and is documented in the [API section](#api--phase-1).
 
 ---
 

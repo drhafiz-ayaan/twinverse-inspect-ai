@@ -1,0 +1,16 @@
+# TwinVerse Inspect AI — model training and evaluation dependencies
+#
+# Kept separate from backend/requirements.txt so the API container does not
+# carry the CUDA runtime. Install into the same venv for local development.
+#
+# Install:
+#   pip install -r ml/requirements.txt
+#
+# No --index-url pin. On Linux the default PyPI wheels are CUDA builds, and
+# torch 2.13.0 resolves to a +cu130 wheel matching the installed 580 driver.
+# See README D-006.
+
+torch==2.13.0
+torchvision==0.28.0
+ultralytics==8.4.135
+opencv-python==5.0.0.93

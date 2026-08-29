@@ -1,0 +1,36 @@
+# TwinVerse Inspect AI — API service dependencies
+#
+# Deliberately excludes torch/torchvision/ultralytics. Those live in
+# ml/requirements.txt: the service does not run inference in-process, and
+# bundling the CUDA stack would add several GB to the backend container image
+# for code it never calls.
+#
+# Install:
+#   pip install -r backend/requirements.txt
+
+# --- API ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+pydantic-settings==2.15.0
+
+# --- Database ---
+SQLAlchemy==2.0.52
+alembic==1.19.1
+psycopg2-binary==2.9.12
+
+# --- Object storage (MinIO / S3-compatible) ---
+boto3==1.43.83
+
+# --- Media probing ---
+# Pillow reads image dimensions; OpenCV reads video duration and frame count.
+# OpenCV is ~60 MB, versus several GB for the full CUDA stack.
+pillow==12.3.0
+opencv-python==5.0.0.93
+
+# --- Reporting (Phase 4) ---
+reportlab==5.0.1
+
+# --- Tests ---
+pytest==9.1.1
+httpx==0.28.1
