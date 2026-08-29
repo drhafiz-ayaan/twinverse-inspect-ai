@@ -89,6 +89,19 @@ def upload_fileobj(fileobj: BinaryIO, key: str, content_type: str,
         raise StorageError(f"upload of {key!r} failed: {exc}") from exc
 
 
+def download_to_path(key: str, destination: str, bucket: str | None = None) -> None:
+    """Fetch an object to a local path.
+
+    Inference needs a real file on disk — OpenCV's video decoder seeks, so a
+    streaming body is not enough.
+    """
+    bucket = bucket or settings.s3_bucket
+    try:
+        get_client().download_file(bucket, key, destination)
+    except ClientError as exc:
+        raise StorageError(f"download of {key!r} failed: {exc}") from exc
+
+
 def delete_object(key: str, bucket: str | None = None) -> None:
     """Best-effort delete, used to roll back a failed upload transaction."""
     bucket = bucket or settings.s3_bucket

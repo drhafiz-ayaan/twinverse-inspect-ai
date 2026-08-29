@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phase 1 complete.** Environment verified ([Environment Status](#environment-status)); upload API shipped with 22 passing integration tests ([API — Phase 1](#api--phase-1)). Next up is Phase 2, defect detection — the critical path.
+**Status:** **Phase 1 complete; Phase 2 pipeline complete, model not yet trained.** Environment verified ([Environment Status](#environment-status)); upload API and detection pipeline shipped with 47 passing integration tests. Inference runs on the GPU in 7 ms, but on COCO weights that do not detect defects — the remaining work is a labelled dataset and a fine-tune. See [Detection — Phase 2](#detection--phase-2) for the honest breakdown.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -21,6 +21,7 @@
 - [Environment Setup — Ubuntu 24.04](#environment-setup--ubuntu-2404-noble)
 - [Optional: ROS2 Jazzy + Gazebo Harmonic](#optional-ros2-jazzy--gazebo-harmonic--phase-6-not-mvp)
 - [API — Phase 1](#api--phase-1)
+- [Detection — Phase 2](#detection--phase-2)
 - [Development Roadmap](#development-roadmap--effort-estimates)
 - [Scope Triage](#scope-triage--what-ships-and-what-does-not)
 - [Severity Scoring Model](#severity-scoring-model)
@@ -342,6 +343,53 @@ Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and edit. 
 
 ---
 
+## Detection — Phase 2
+
+### Honest status
+
+**The pipeline is built, tested and running on the GPU. It does not yet detect real defects.**
+
+Inference currently loads `yolo11n.pt`, which is **COCO-pretrained** — it detects people, cars and traffic lights, not cracks. Verified on this machine: weights load, warm inference runs in **7 ms** on the RTX 3080, and the class mapper correctly discards every COCO label because none of them are defect classes. That is the pipeline working exactly as designed and finding nothing, which is the correct outcome for the wrong weights.
+
+What remains is the part the README always said was the risk: **a labelled dataset and a fine-tune**. See [`ml/datasets/README.md`](ml/datasets/README.md) — including the trap that SDNET2018, the most-cited option, is a *classification* set with no bounding boxes.
+
+Until `MODEL_WEIGHTS` points at a fine-tuned checkpoint, no claim about defect detection is defensible. Stating that plainly is the same discipline as [D-004](#d-004--severity-scoring-is-relative-not-absolute).
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/media/{id}/detect` | Run inference on one file, synchronous, returns detections |
+| `GET` | `/api/v1/media/{id}/detections` | Detections for one file, confidence-ordered |
+| `POST` | `/api/v1/inspections/{id}/detect` | Dispatch across an inspection — **202**, poll `status` |
+| `GET` | `/api/v1/inspections/{id}/detections` | All detections in an inspection |
+| `GET` | `/api/v1/inspections/{id}/detections/summary` | Counts by defect class, for the dashboard |
+| `GET` | `/api/v1/detector` | Which weights are actually loaded |
+
+That last endpoint exists because "which model produced these boxes" is the first question anyone asks of a detection, and inferring it from config is not good enough.
+
+### Video handling
+
+Video is **sampled, not decoded frame by frame**. A 60-second clip at 30 fps is 1800 frames, and adjacent frames show the same defect from nearly the same angle — processing all of them multiplies runtime and fills the table with near-duplicate rows. Default stride is 15 frames, capped at 300 analyzed frames. Detections carry `frame_index` so the dashboard can seek to them.
+
+### Training a real detector
+
+```bash
+python ml/prepare_dataset.py --source ~/downloads/concrete-cracks --output ml/datasets/concrete --classes crack corrosion surface_damage
+```
+
+```bash
+python ml/train.py --data ml/datasets/concrete/data.yaml --epochs 100
+```
+
+```bash
+MODEL_WEIGHTS=/abs/path/to/ml/weights/defect-detector.pt uvicorn app.main:app
+```
+
+`train.py` **exits rather than falling back to CPU** if CUDA is unavailable. A run that silently trains on CPU for a week is the same failure as [D-002](#d-002--windows-nvidia-driver-was-critically-outdated) wearing a different hat.
+
+---
+
 ## Development Roadmap & Effort Estimates
 
 Estimates assume a solo developer working with AI pair-programming assistance.
@@ -350,7 +398,7 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 |---|---|---|---|
 | **0** | Ubuntu migration, drivers, toolchain, repo scaffold | 0.5–1 d | ✅ done |
 | **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d | ✅ done |
-| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ⬜ next |
+| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ◐ pipeline done; **needs dataset + fine-tune** |
 | **3** | Severity scoring engine | 0.5 d | ⬜ |
 | **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ |
 | **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ |
@@ -439,18 +487,20 @@ twinverse-inspect-ai/
 │   │   ├── main.py             ✅ app factory, CORS, lifespan
 │   │   ├── api/
 │   │   │   ├── deps.py         ✅ shared 404 lookups
-│   │   │   └── routers/        ✅ health, assets, inspections, uploads
-│   │   │                       ⬜ detections, reports
+│   │   │   └── routers/        ✅ health, assets, inspections, uploads, detections
+│   │   │                       ⬜ reports
 │   │   ├── core/               ✅ config          ⬜ security, JWT
 │   │   ├── db/                 ✅ base, models, session, migrations/
-│   │   ├── schemas/            ✅ asset, inspection, media
-│   │   └── services/           ✅ storage, media   ⬜ inference, severity, reporting
-│   └── tests/                  ✅ 22 integration tests
+│   │   ├── schemas/            ✅ asset, inspection, media, detection
+│   │   └── services/           ✅ storage, media, inference, detection
+│   │                           ⬜ severity, reporting
+│   └── tests/                  ✅ 47 integration tests
 ├── ml/                         ◐ model training and evaluation
 │   ├── requirements.txt        ✅ torch, torchvision, ultralytics
-│   ├── datasets/               ⬜ (gitignored)
+│   ├── prepare_dataset.py      ✅ split + data.yaml generation
+│   ├── train.py                ✅ YOLOv11 fine-tune
+│   ├── datasets/               ✅ README    ⬜ data (gitignored)
 │   ├── notebooks/              ⬜
-│   ├── train.py                ⬜
 │   └── weights/                ⬜ (gitignored — Git LFS or GitHub Releases)
 ├── frontend/                   ⬜ Next.js dashboard + Three.js viewer
 ├── infra/                      ⬜ docker-compose.yml, .github/workflows/
@@ -561,6 +611,40 @@ The entire claim of the upload path is that bytes land in object storage and a r
 The suite also applies the **Alembic migration** rather than `Base.metadata.create_all`, so it fails when the migration drifts from the models — the drift being the thing most likely to break a deployment while every unit test still passes.
 
 Cost: the tests need Docker running. That is an acceptable trade at this stage and is documented in the [API section](#api--phase-1).
+
+### D-011 — Unrecognized model classes are discarded, never guessed
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+Fine-tuned checkpoints from different datasets use different label vocabularies (`crack`, `cracks`, `spalling`, `rust`). An alias table in `inference.py` maps them onto the four defect classes; anything not in the table returns `None` and the box is dropped.
+
+The alternative — defaulting unknown labels to some class — would let a COCO model's `person` detection be filed as a crack, and every downstream severity number computed from it would be wrong while looking entirely plausible. Dropping data is recoverable; silently corrupting it is not.
+
+### D-012 — Video is sampled, not decoded frame by frame
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+A 60-second clip at 30 fps is 1800 frames. Adjacent frames show the same defect from nearly the same angle, so full decoding multiplies inference time and fills the detections table with near-duplicate rows carrying no extra information.
+
+Default stride is 15 frames with a 300-frame cap, both configurable. Detections carry `frame_index` so the dashboard can seek to the source moment.
+
+Known limitation, worth stating before a judge finds it: **the same physical crack appearing in twelve sampled frames currently produces twelve detection rows.** Cross-frame deduplication (tracking, or IoU-based merging) is not implemented. Until it is, video defect *counts* overstate reality — image counts do not.
+
+### D-013 — Phase 2 writes geometry, not severity
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+Detection rows are written with `normalized_area` populated — it is free, being just `bbox_width × bbox_height` — but `class_weight`, `severity_score` and `severity_band` are left **null**.
+
+Writing placeholder scores now would make unscored rows indistinguishable from scored ones the moment Phase 3 lands, and a null is an honest "not computed yet" in a way that `0.0` is not.
+
+### D-014 — The detector sits behind a protocol so the pipeline is testable without weights
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+`inference.py` exposes a `Detector` protocol with a swappable implementation. Tests inject a stub returning fixed boxes.
+
+This keeps the suite from depending on a model download, and draws the right line: whether storage → inference → database persistence works is a question about *this code* and is tested here; whether YOLO actually finds cracks is a question about *weights and training data*, and is answered by training metrics, not by unit tests. Conflating the two produces tests that pass while the product does nothing useful.
 
 ---
 

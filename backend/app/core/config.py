@@ -59,6 +59,24 @@ class Settings(BaseSettings):
     # Presigned download links handed to the dashboard.
     presign_expiry_seconds: int = 3600
 
+    # --- Inference (Phase 2) ---
+    # Path to YOLO weights. A bare name like "yolo11n.pt" is resolved by
+    # Ultralytics against its own cache and downloaded on first use; a filesystem
+    # path points at a fine-tuned checkpoint from ml/train.py.
+    model_weights: str = "yolo11n.pt"
+
+    # "cuda:0", "cpu", or None to let Ultralytics choose.
+    inference_device: str | None = None
+
+    # Boxes below this confidence are discarded before they reach the database.
+    confidence_threshold: float = 0.25
+
+    # Video is sampled rather than processed frame by frame: a 60 s clip at
+    # 30 fps is 1800 frames, and adjacent frames show the same defect. Sampling
+    # every Nth frame keeps runtime and duplicate rows down.
+    video_frame_stride: int = 15
+    video_max_frames: int = 300
+
     @property
     def allowed_content_types(self) -> tuple[str, ...]:
         return self.allowed_image_types + self.allowed_video_types

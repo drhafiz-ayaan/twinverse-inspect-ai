@@ -22,8 +22,13 @@ npm-debug.log*
 *.key
 
 # ML — datasets and weights (see README: use Git LFS or GitHub Releases)
-ml/datasets/
-ml/weights/
+# Directory contents are excluded with /* rather than /, so the documentation
+# inside can be un-ignored: a negation cannot escape an excluded directory.
+ml/datasets/*
+!ml/datasets/README.md
+ml/weights/*
+!ml/weights/.gitkeep
+ml/runs/
 runs/
 *.pt
 *.onnx
