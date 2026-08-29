@@ -659,7 +659,9 @@ This keeps the suite from depending on a model download, and draws the right lin
 
 **Date:** 2026-08-30 · **Status:** Accepted
 
-`research-cz7vi/nitw-concrete-crack-detection` v6 — CC BY 4.0, 1197 train / 355 val / 225 test, 3,123 training annotations, single class `crack` that maps directly onto `DefectClass.CRACK`.
+`research-cz7vi/nitw-concrete-crack-detection` v6 — CC BY 4.0, 1197 train / 355 val / 225 test, **4,320** training annotations, single class `crack` that maps directly onto `DefectClass.CRACK`.
+
+*(An earlier revision of this entry said 3,123 annotations. That count came from `cat labels/*.txt | wc -l`, which undercounts by one per file because YOLO label files carry no trailing newline — `wc -l` counts newline characters, so the last annotation in every file was invisible. Count with `awk 'NF'` instead.)*
 
 **Correction on record.** `ycc-otptp/concrete-bridge-defect` was selected first, on the basis that its project page lists four classes (`crack`, `spalling`, `exposed-bar`, `stain`) and multi-class data would make `class_weight` in the severity formula meaningful. That was wrong: the four classes describe the project's *annotations*, and **every exported version remaps them into a single generic `defect` label** — verified on v4 (3,166 annotations) and v6 (13,088), all class index 0.
 
@@ -669,6 +671,27 @@ Two consequences of a single-class dataset, both to be stated in the demo rather
 
 - **`class_weight` is constant at 1.0**, so severity reduces to `area × confidence` in practice. The formula is unchanged and still worth showing on screen, but describing it as weighting *across defect types* would misrepresent what the model does.
 - **The dataset contains zero background images** — every training image has at least one crack, so the model never sees clean concrete. Expect false positives on undamaged surfaces; it has no examples of "nothing here". `concrete-bridge-defect` v6 has 84 background images and both sets are CC BY 4.0, so grafting them in is an available mitigation.
+
+### D-016 — mAP is not sufficient evidence; false positives on clean surfaces must be measured separately
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+The first fine-tune (`nitw-concrete-crack` alone, best epoch 50) reached mAP50 **0.442**, mAP50-95 **0.144** — mediocre but arguably demoable. Evaluated against 94 defect-free photographs it was not demoable at all:
+
+| Threshold | False positives on clean | Detections on defective |
+|---|---|---|
+| 0.25 (configured default) | **88.3%** | 95.6% |
+| 0.40 | 51.1% | 76.9% |
+| 0.50 | 26.6% | 44.9% |
+| 0.60 | **9.6%** | **4.9%** |
+
+Confidence distributions were effectively identical — median 0.163 on clean surfaces against 0.177 on defective — so **no threshold separates them**. At 0.60 the false-positive rate *exceeds* the detection rate: the model was likelier to fire on intact concrete than on a crack.
+
+The cause is [D-015](#d-015--training-dataset-nitw-concrete-crack-detection-v6)'s zero-background problem. A detector trained only on images that all contain cracks never learns what an absence looks like, and mAP cannot reveal this because it is computed over annotated defects only — there are no clean images in the validation set to get it wrong on.
+
+**Consequence for this project:** mAP alone is never sufficient evidence that the detector works. Every model is evaluated with `ml/evaluate.py` against held-out defect-free imagery before any claim is made about it. The 94 bridge background images are reserved for this and deliberately excluded from training so the test stays honest.
+
+Two confounds are acknowledged rather than hidden: the clean set comes from a different dataset, so part of the gap is domain shift; and those images are "clean" only because the bridge annotator drew no boxes, so a few may contain unlabelled hairline cracks. Neither explains identical median confidences.
 
 ---
 
