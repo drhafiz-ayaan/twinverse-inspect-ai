@@ -4,8 +4,9 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** Pre-development. Planning complete, environment migration to Ubuntu 24.04 in progress.
+**Status:** Pre-development. Planning complete. Ubuntu 24.04 migration **complete and verified** — see [Environment Status](#environment-status). No application code written yet; Phase 0 scaffold in progress.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
+**Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
 ---
 
@@ -16,6 +17,7 @@
 - [System Architecture](#system-architecture)
 - [Tech Stack](#tech-stack)
 - [Development Machine Profile](#development-machine-profile)
+- [Environment Status](#environment-status)
 - [Environment Setup — Ubuntu 24.04](#environment-setup--ubuntu-2404-noble)
 - [Optional: ROS2 Jazzy + Gazebo Harmonic](#optional-ros2-jazzy--gazebo-harmonic--phase-6-not-mvp)
 - [Development Roadmap](#development-roadmap--effort-estimates)
@@ -25,7 +27,7 @@
 - [Repository Structure](#planned-repository-structure)
 - [Demo Strategy](#demo-strategy)
 - [Decision Log](#decision-log)
-- [Pre-Migration Checklist](#pre-migration-checklist)
+- [Backup & Repository](#backup--repository)
 
 ---
 
@@ -101,7 +103,43 @@ Captured so the environment can be reproduced after the OS migration.
 
 ---
 
+## Environment Status
+
+Verified on the development machine **2026-08-30**. The [setup guide below](#environment-setup--ubuntu-2404-noble) remains the reproduction procedure for a fresh machine; this table is the current state of *this* one.
+
+| Component | Verified state |
+|---|---|
+| OS | Ubuntu 24.04.4 LTS ✅ |
+| NVIDIA driver | 580.173.02, CUDA 13.0 ✅ |
+| GPU visible to `nvidia-smi` | RTX 3080 Laptop, 16384 MiB ✅ |
+| Python | 3.12.3 ✅ |
+| Docker engine | 29.1.3 installed ✅ |
+| Git | 2.43.0 ✅ |
+| Free disk | 153 GB ✅ |
+| Docker **group membership** | ❌ user not in `docker` group — socket returns permission denied |
+| Node.js | ❌ not installed |
+| Python venv + ML deps | 🔄 `.venv` created, PyTorch install in progress |
+| GPU mode (`prime-select`) | `on-demand` — switch to `nvidia` before training runs |
+
+### Remaining setup
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Log out and back in afterward for the group change to apply.
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && source ~/.bashrc && nvm install 20 && nvm alias default 20
+```
+
+Node is installed via **nvm** rather than the NodeSource method in step 4 below — it needs no root and avoids running a remote script under `sudo`.
+
+---
+
 ## Environment Setup — Ubuntu 24.04 (Noble)
+
+> **Already done on this machine.** Steps 1–4 below are complete except for the docker group membership; step 5 is in progress. This section is retained as the reproduction procedure for a fresh install. See [Environment Status](#environment-status) for what actually remains.
 
 ### Read first: NVIDIA drivers are NOT preinstalled
 
@@ -132,8 +170,10 @@ nvidia-smi
 If `ubuntu-drivers` picks an unexpected version, pin explicitly (Ampere supports the open kernel modules):
 
 ```bash
-sudo apt install -y nvidia-driver-570-open
+sudo apt install -y nvidia-driver-580-open
 ```
+
+*(This machine resolved to **580.173.02 / CUDA 13.0** automatically. An earlier draft of this README suggested `nvidia-driver-570-open`; that is now older than the default and should not be used as a pin.)*
 
 ### 2. CUDA toolkit — you probably do NOT need it
 
@@ -156,8 +196,10 @@ sudo apt install -y build-essential git curl wget python3.12 python3.12-venv pyt
 ```
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && source ~/.bashrc && nvm install 20 && nvm alias default 20
 ```
+
+Node 20 via **nvm**, chosen over the NodeSource `curl … | sudo -E bash -` method: it needs no root, does not execute a remote script as superuser, and makes version switching trivial. Ubuntu's own `apt install nodejs` is not used — Noble ships Node 18.19, which is end-of-life.
 
 ```bash
 sudo apt install -y docker.io docker-compose-v2 && sudo usermod -aG docker $USER
@@ -172,8 +214,10 @@ python3.12 -m venv .venv && source .venv/bin/activate && pip install --upgrade p
 ```
 
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchvision
 ```
+
+The default PyPI wheels bundle a current CUDA runtime and work against the 580 driver. An earlier draft pinned `--index-url https://download.pytorch.org/whl/cu124`; that pin is unnecessary here and risks selecting a runtime older than the installed driver. Only pin an index if you have a specific reason to.
 
 ```bash
 pip install ultralytics opencv-python fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary alembic python-multipart boto3 reportlab pydantic-settings
@@ -369,25 +413,44 @@ NeRF and Gaussian Splatting pipelines are weeks of work. The MVP ships a Three.j
 
 Absolute measurements (crack width in mm) require camera calibration or an in-frame scale reference. The MVP outputs a relative severity band and states this limitation explicitly in both the UI and the pitch.
 
+### D-005 — Migration executed and verified; D-001 and D-002 closed
+
+**Date:** 2026-08-30 · **Status:** Resolved
+
+The Ubuntu 24.04 migration decided in D-001 is complete. Verified state: Ubuntu 24.04.4 LTS, NVIDIA **580.173.02 / CUDA 13.0**, RTX 3080 Laptop reporting the full 16384 MiB under `nvidia-smi`, Python 3.12.3, Docker 29.1.3.
+
+This closes D-002 — the critically outdated Windows driver 471.41 is gone, and the replacement is current. The `nvidia-smi` verification D-002 insisted on before any ML work has been performed and passed.
+
+**Correction on record:** the [Pre-Migration Checklist](#backup--repository) required pushing the planning artifacts to GitHub *before* wiping Windows. The wipe was done first and the push was not done at all, leaving this README and the proposal PDF with no off-machine copy. Caught and remediated on 2026-08-30. The ordering error, not the migration, was the real risk.
+
+### D-006 — Node.js via nvm, not NodeSource
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+The original setup step piped a NodeSource script into `sudo -E bash -`. Replaced with nvm: it installs into the user's home directory, requires no root, avoids executing a remote script with superuser rights, and makes Node version switching trivial. Ubuntu's packaged `nodejs` was rejected — Noble ships 18.19, which is end-of-life.
+
+Similarly, the PyTorch `--index-url .../cu124` pin was dropped in favour of the default PyPI wheels, which carry a CUDA runtime matched to the installed 580 driver. Pinning an older runtime than the driver buys nothing here.
+
 ---
 
-## Pre-Migration Checklist
+## Backup & Repository
 
-**Before wiping Windows**, preserve this work. This README and the proposal PDF are currently the only artifacts of the planning effort.
+**Done — 2026-08-30.** This section previously read "Pre-Migration Checklist" and described work to do *before* wiping Windows. The migration happened first and the backup did not, so the planning artifacts survived on a single disk with no remote copy for a period. That gap is now closed.
+
+Current state:
+
+- Repository initialized on `main`, initial commit `c1c0454`
+- Pushed to **`git@github.com:drhafiz-ayaan/twinverse-inspect-ai.git`** — **private**
+- Tracked: `README.md`, `TwinVerse_Inspect_AI_Master_Proposal.pdf`, `.gitignore`
+- `.gitignore` excludes `.venv/`, `node_modules/`, secrets, and — per the [repository structure](#planned-repository-structure) — `ml/datasets/` and `ml/weights/`
+
+Flip to public before hackathon submission if required:
 
 ```bash
-git init && git add . && git commit -m "Initial: proposal and development blueprint"
+gh repo edit drhafiz-ayaan/twinverse-inspect-ai --visibility public
 ```
 
-```bash
-git branch -M main && git remote add origin https://github.com/<username>/twinverse-inspect-ai.git && git push -u origin main
-```
-
-Confirm the push succeeded on GitHub before reformatting the drive.
-
-Also back up separately:
-- `TwinVerse_Inspect_AI_Master_Proposal.pdf`
-- Any datasets already downloaded (re-downloading costs hours)
+**Still not backed up anywhere:** any datasets downloaded for Phase 2. These are deliberately gitignored (too large for the repo), so they need separate backup — re-downloading costs hours. Use Git LFS or GitHub Releases for trained weights.
 
 ---
 
