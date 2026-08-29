@@ -374,6 +374,14 @@ Video is **sampled, not decoded frame by frame**. A 60-second clip at 30 fps is 
 
 ### Training a real detector
 
+Fetch a pre-labelled dataset from Roboflow Universe (needs `ROBOFLOW_API_KEY` in `backend/.env`):
+
+```bash
+python ml/fetch_dataset.py --url https://universe.roboflow.com/<workspace>/<project>/dataset/<version>
+```
+
+Roboflow exports arrive already split, so skip straight to training. For a flat, unsplit dataset from elsewhere, use `prepare_dataset.py` instead:
+
 ```bash
 python ml/prepare_dataset.py --source ~/downloads/concrete-cracks --output ml/datasets/concrete --classes crack corrosion surface_damage
 ```
@@ -496,7 +504,8 @@ twinverse-inspect-ai/
 │   │                           ⬜ severity, reporting
 │   └── tests/                  ✅ 47 integration tests
 ├── ml/                         ◐ model training and evaluation
-│   ├── requirements.txt        ✅ torch, torchvision, ultralytics
+│   ├── requirements.txt        ✅ torch, ultralytics, roboflow
+│   ├── fetch_dataset.py        ✅ Roboflow download + data.yaml repair
 │   ├── prepare_dataset.py      ✅ split + data.yaml generation
 │   ├── train.py                ✅ YOLOv11 fine-tune
 │   ├── datasets/               ✅ README    ⬜ data (gitignored)

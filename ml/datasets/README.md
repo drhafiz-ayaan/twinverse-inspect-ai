@@ -27,8 +27,42 @@ training needs boxes. Either budget for labelling, or start with a Roboflow set
 that already has them. The README puts Phase 2 at 2–4 days with the risk being
 "dataset quality, not compute" — this is that risk, concretely.
 
-## Preparing a set
+## Fetching from Roboflow (recommended path)
 
+```bash
+python ml/fetch_dataset.py --url https://universe.roboflow.com/<workspace>/<project>/dataset/<version>
+```
+
+The API key is read from `ROBOFLOW_API_KEY` in the environment or
+`backend/.env`. It is **never printed, logged, or written to disk** by the
+script — including in error messages, which report the exception type rather
+than echoing a failed request.
+
+Get a key from app.roboflow.com → Settings → API Keys. Put it in
+`backend/.env` (gitignored), **never** in `backend/.env.example`, which is
+committed.
+
+The script also:
+
+- **Rewrites `data.yaml` split paths to absolute.** Roboflow emits relative
+  paths like `../train/images` that resolve against the working directory —
+  the single most common cause of a "dataset not found" failure once training
+  is launched from the repo root rather than the dataset folder.
+- **Reports the dataset's class names** and flags any that the detector would
+  discard, importing the alias table from
+  [`inference.py`](../../backend/app/services/inference.py) so there is one
+  source of truth rather than two lists that drift.
+- **Warns if `ROBOFLOW_API_KEY` is defined more than once** in `.env`. dotenv
+  lets the last definition silently win, so a stale placeholder below a real
+  key shadows it and the only symptom is an auth failure pointing nowhere.
+
+Roboflow exports arrive already split into train/valid/test with a `data.yaml`,
+so `prepare_dataset.py` is **not** needed afterwards — go straight to training.
+
+## Preparing a set from another source
+
+`prepare_dataset.py` is for **flat, unsplit** datasets — Kaggle downloads,
+manually labelled sets, anything that is not already organised into splits.
 Once a YOLO-format dataset is downloaded:
 
 ```bash

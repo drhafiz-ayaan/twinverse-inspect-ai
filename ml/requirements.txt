@@ -14,3 +14,10 @@ torch==2.13.0
 torchvision==0.28.0
 ultralytics==8.4.135
 opencv-python==5.0.0.93
+
+# --- Dataset acquisition ---
+# ml/fetch_dataset.py reads ROBOFLOW_API_KEY from the environment or
+# backend/.env. Never from a committed file.
+roboflow==1.4.1
+PyYAML==6.0.3
+python-dotenv==1.2.3
