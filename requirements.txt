@@ -1,0 +1,45 @@
+# TwinVerse Inspect AI — Python dependencies
+#
+# Direct dependencies only, pinned to the versions verified on the development
+# machine 2026-08-30 (Ubuntu 24.04.4, Python 3.12.3, RTX 3080 Laptop 16 GB).
+# Transitive dependencies are left to the resolver; `pip freeze` reports 85
+# packages in total for this set.
+#
+# Temporary location. Per the planned repository structure this moves to
+# backend/requirements.txt once the service scaffold exists, with the ml/
+# training dependencies likely splitting into their own file at that point.
+#
+# Install:
+#   python3.12 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Verify the GPU is visible before any training work (see README D-002):
+#   python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+#   -> True NVIDIA GeForce RTX 3080 Laptop GPU
+
+# --- Deep learning / CV -------------------------------------------------------
+# No --index-url pin. On Linux the default PyPI wheels are CUDA builds; torch
+# 2.13.0 resolves to a +cu130 wheel matching the installed 580 driver. Pinning
+# the old cu124 index would install a runtime older than the driver for no
+# benefit. See README D-006.
+torch==2.13.0
+torchvision==0.28.0
+ultralytics==8.4.135
+opencv-python==5.0.0.93
+
+# --- API service --------------------------------------------------------------
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+pydantic-settings==2.15.0
+
+# --- Database -----------------------------------------------------------------
+SQLAlchemy==2.0.52
+alembic==1.19.1
+psycopg2-binary==2.9.12
+
+# --- Object storage (MinIO / S3-compatible; swappable for Alibaba Cloud OSS) ---
+boto3==1.43.83
+
+# --- Reporting ----------------------------------------------------------------
+reportlab==5.0.1

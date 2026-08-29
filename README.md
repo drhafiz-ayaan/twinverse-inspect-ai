@@ -122,6 +122,7 @@ Verified on the development machine **2026-08-30**. The [setup guide below](#env
 | Ultralytics / OpenCV | ✅ 8.4.135 / 5.0.0 |
 | FastAPI / SQLAlchemy / Alembic | ✅ 0.141.1 / 2.0.52 / 1.19.1 |
 | boto3 / ReportLab / pydantic-settings | ✅ installed |
+| Dependency pinning | ✅ [`requirements.txt`](requirements.txt) — direct deps pinned, dry-run verified against this environment |
 | Docker **group membership** | ❌ user not in `docker` group — socket returns permission denied |
 | Node.js | ❌ not installed |
 | GPU mode (`prime-select`) | `on-demand` — switch to `nvidia` before training runs |
@@ -220,14 +221,10 @@ python3.12 -m venv .venv && source .venv/bin/activate && pip install --upgrade p
 ```
 
 ```bash
-pip install torch torchvision
+pip install -r requirements.txt
 ```
 
-The default PyPI wheels bundle a current CUDA runtime and work against the 580 driver. An earlier draft pinned `--index-url https://download.pytorch.org/whl/cu124`; that pin is unnecessary here and risks selecting a runtime older than the installed driver. Only pin an index if you have a specific reason to.
-
-```bash
-pip install ultralytics opencv-python fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary alembic python-multipart boto3 reportlab pydantic-settings
-```
+[`requirements.txt`](requirements.txt) pins the direct dependencies to the versions verified on this machine. Note it carries **no `--index-url`**: on Linux the default PyPI wheels are CUDA builds, and `torch==2.13.0` resolves to a `+cu130` wheel matching the installed 580 driver. An earlier draft pinned `--index-url https://download.pytorch.org/whl/cu124`, which would install a runtime *older* than the driver for no benefit. See [D-006](#d-006--nodejs-via-nvm-not-nodesource).
 
 Verify the GPU is visible to PyTorch:
 
@@ -371,8 +368,11 @@ twinverse-inspect-ai/
 │   ├── docker-compose.yml
 │   └── .github/workflows/
 ├── docs/
+├── requirements.txt      # temporary — see note below
 └── README.md
 ```
+
+**Note on `requirements.txt`:** it currently sits at the repo root because no `backend/` or `ml/` directory exists yet. When the scaffold lands it should move to `backend/requirements.txt`, with the training-only dependencies (`torch`, `torchvision`, `ultralytics`) likely splitting into `ml/requirements.txt` — the API service does not need the full CUDA stack, and keeping them together would bloat the backend Docker image by several GB.
 
 ---
 
