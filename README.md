@@ -116,10 +116,16 @@ Verified on the development machine **2026-08-30**. The [setup guide below](#env
 | Docker engine | 29.1.3 installed ✅ |
 | Git | 2.43.0 ✅ |
 | Free disk | 153 GB ✅ |
+| Python venv | ✅ `.venv/` — Python 3.12.3 |
+| PyTorch | ✅ **2.13.0+cu130** — `torch.cuda.is_available()` returns `True` |
+| GPU compute | ✅ verified — 4096² matmul, 6.3 TFLOP/s fp32, cuDNN 9.2 |
+| Ultralytics / OpenCV | ✅ 8.4.135 / 5.0.0 |
+| FastAPI / SQLAlchemy / Alembic | ✅ 0.141.1 / 2.0.52 / 1.19.1 |
+| boto3 / ReportLab / pydantic-settings | ✅ installed |
 | Docker **group membership** | ❌ user not in `docker` group — socket returns permission denied |
 | Node.js | ❌ not installed |
-| Python venv + ML deps | 🔄 `.venv` created, PyTorch install in progress |
 | GPU mode (`prime-select`) | `on-demand` — switch to `nvidia` before training runs |
+| GPU power cap | 80 W reported by `nvidia-smi`. Low for a GS66 3080; check the MSI power/thermal profile before benchmarking Phase 2 training throughput. |
 
 ### Remaining setup
 
