@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ML — datasets and weights (see README: use Git LFS or GitHub Releases)
+ml/datasets/
+ml/weights/
+runs/
+*.pt
+*.onnx
+*.engine
+
+# Media / uploads
+uploads/
+*.mp4
+*.mov
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
