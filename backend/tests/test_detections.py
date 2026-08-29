@@ -85,6 +85,39 @@ def test_unknown_class_names_are_discarded(name) -> None:
     assert map_class_name(name) is None
 
 
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("crack", DefectClass.CRACK),
+        ("spalling", DefectClass.SURFACE_DAMAGE),
+        ("exposed-bar", DefectClass.MISSING_COMPONENT),
+    ],
+)
+def test_bridge_dataset_classes_map(name, expected) -> None:
+    """The three scored classes of ycc-otptp/concrete-bridge-defect v6.
+
+    Exposed rebar is MISSING_COMPONENT, not SURFACE_DAMAGE: it is the absent
+    concrete cover that matters, and it carries the 1.0 class weight rather
+    than 0.6 accordingly.
+    """
+    assert map_class_name(name) is expected
+
+
+def test_stain_is_deliberately_not_a_defect() -> None:
+    """Staining is a symptom of water ingress, not structural damage.
+
+    The model is trained on the class — knowing what a stain looks like helps
+    it avoid calling one a crack — but the detections are discarded rather than
+    scored. Counting stains would inflate severity totals with something no
+    structural engineer calls a defect.
+
+    This test exists so nobody 'helpfully' adds the alias later without
+    reading why it is missing.
+    """
+    assert map_class_name("stain") is None
+    assert map_class_name("staining") is None
+
+
 def test_normalized_area_is_box_geometry() -> None:
     det = RawDetection(DefectClass.CRACK, 0.9, (0.1, 0.1, 0.25, 0.40))
     assert det.normalized_area == pytest.approx(0.10)

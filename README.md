@@ -655,6 +655,21 @@ Writing placeholder scores now would make unscored rows indistinguishable from s
 
 This keeps the suite from depending on a model download, and draws the right line: whether storage → inference → database persistence works is a question about *this code* and is tested here; whether YOLO actually finds cracks is a question about *weights and training data*, and is answered by training metrics, not by unit tests. Conflating the two produces tests that pass while the product does nothing useful.
 
+### D-015 — Training dataset: NITW concrete crack detection v6
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+`research-cz7vi/nitw-concrete-crack-detection` v6 — CC BY 4.0, 1197 train / 355 val / 225 test, 3,123 training annotations, single class `crack` that maps directly onto `DefectClass.CRACK`.
+
+**Correction on record.** `ycc-otptp/concrete-bridge-defect` was selected first, on the basis that its project page lists four classes (`crack`, `spalling`, `exposed-bar`, `stain`) and multi-class data would make `class_weight` in the severity formula meaningful. That was wrong: the four classes describe the project's *annotations*, and **every exported version remaps them into a single generic `defect` label** — verified on v4 (3,166 annotations) and v6 (13,088), all class index 0.
+
+That rules the dataset out for a reason beyond class count: a generic `defect` label is a union of crack, spalling, exposed rebar and staining, and there is no honest mapping from it to a specific defect class. Calling it `crack` would be precisely the overclaim [D-004](#d-004--severity-scoring-is-relative-not-absolute) exists to prevent. The lesson: **verify an actual export, not the project metadata.**
+
+Two consequences of a single-class dataset, both to be stated in the demo rather than glossed:
+
+- **`class_weight` is constant at 1.0**, so severity reduces to `area × confidence` in practice. The formula is unchanged and still worth showing on screen, but describing it as weighting *across defect types* would misrepresent what the model does.
+- **The dataset contains zero background images** — every training image has at least one crack, so the model never sees clean concrete. Expect false positives on undamaged surfaces; it has no examples of "nothing here". `concrete-bridge-defect` v6 has 84 background images and both sets are CC BY 4.0, so grafting them in is an available mitigation.
+
 ---
 
 ## Backup & Repository

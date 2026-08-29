@@ -65,7 +65,25 @@ CLASS_ALIASES: dict[str, DefectClass] = {
     "missing component": DefectClass.MISSING_COMPONENT,
     "missing_bolt": DefectClass.MISSING_COMPONENT,
     "missing": DefectClass.MISSING_COMPONENT,
+    # Exposed reinforcement: the concrete cover is gone. Filed under
+    # MISSING_COMPONENT rather than SURFACE_DAMAGE because it is the missing
+    # cover that matters — exposed rebar corrodes and the section loses
+    # capacity, so it warrants the 1.0 class weight rather than 0.6.
+    "exposed_bar": DefectClass.MISSING_COMPONENT,
+    "exposed bar": DefectClass.MISSING_COMPONENT,
+    "exposed_rebar": DefectClass.MISSING_COMPONENT,
+    "exposed rebar": DefectClass.MISSING_COMPONENT,
+    "rebar": DefectClass.MISSING_COMPONENT,
 }
+
+# Deliberately absent: "stain".
+#
+# Staining is a *symptom* — usually water ingress or leaching — not structural
+# damage. The concrete-bridge-defect dataset labels it, and the model is trained
+# on it (knowing what a stain looks like helps it avoid calling one a crack),
+# but stain detections are discarded here rather than scored. Counting stains as
+# defects would inflate severity totals with something no structural engineer
+# would call a defect, which is exactly the overclaiming D-004 exists to avoid.
 
 
 def map_class_name(name: str) -> DefectClass | None:
