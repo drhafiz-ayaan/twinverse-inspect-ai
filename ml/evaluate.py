@@ -130,6 +130,84 @@ def report(title: str, per_image: list[list[float]], thresholds: list[float],
               f"max={all_conf[-1]:.3f}  ({len(all_conf)} boxes total)")
 
 
+def separation(clean: list[list[float]], defective: list[list[float]],
+               thresholds: list[float]) -> tuple[float, float]:
+    """Best achievable margin between detection rate and false-positive rate.
+
+    max over thresholds of (detection_rate - false_positive_rate) — Youden's J.
+    0.0 means the model cannot tell clean concrete from cracked concrete at any
+    threshold; 1.0 means perfect separation.
+
+    This is the number that matters. mAP is computed over annotated defects
+    only, so a validation set with no clean images cannot expose a detector
+    that fires on everything (D-016).
+    """
+    best_j, best_t = -1.0, thresholds[0]
+    for t in thresholds:
+        tpr = (
+            sum(1 for c in defective if any(x >= t for x in c)) / len(defective)
+            if defective else 0.0
+        )
+        fpr = (
+            sum(1 for c in clean if any(x >= t for x in c)) / len(clean)
+            if clean else 0.0
+        )
+        if tpr - fpr > best_j:
+            best_j, best_t = tpr - fpr, t
+    return best_j, best_t
+
+
+def report_separation(clean: list[list[float]], defective: list[list[float]],
+                      thresholds: list[float]) -> float:
+    """Print the separation summary. Returns Youden's J, or -1.0 if degenerate.
+
+    A model producing no detections at all also scores J = 0, identically to
+    one firing at random. Those need different responses — "train longer"
+    versus "change the approach" — so the silent case is detected and reported
+    separately rather than collapsed into a verdict.
+    """
+    j, t = separation(clean, defective, thresholds)
+
+    def median(per_image):
+        vals = sorted(c for confs in per_image for c in confs)
+        return vals[len(vals) // 2] if vals else None
+
+    n_clean = sum(len(c) for c in clean)
+    n_defect = sum(len(c) for c in defective)
+
+    print("\n" + "=" * 62)
+    print("SEPARATION — can the model tell clean from cracked?")
+    print("=" * 62)
+
+    if n_defect == 0:
+        print("  the model produced NO detections on defective images.")
+        print("  Separation is undefined — this is not evidence the approach")
+        print("  is wrong, only that the model has not learned to fire yet.")
+        print("\n  -> train longer, or on more images, before judging it.")
+        return -1.0
+
+    mc, md = median(clean), median(defective)
+    print(f"  median confidence, clean     : "
+          f"{'none — no false positives' if mc is None else f'{mc:.3f}'}")
+    print(f"  median confidence, defective : {md:.3f}")
+    print(f"  boxes: {n_clean} on clean, {n_defect} on defective")
+    print(f"\n  best margin (detect - false alarm): {j:.3f}  at conf {t:.2f}")
+
+    if j < 0.15:
+        verdict = "UNUSABLE — barely better than firing at random"
+    elif j < 0.35:
+        verdict = "POOR — will embarrass you on clean surfaces"
+    elif j < 0.55:
+        verdict = "MARGINAL — demoable with a carefully chosen threshold"
+    elif j < 0.75:
+        verdict = "DECENT"
+    else:
+        verdict = "STRONG"
+    print(f"  verdict: {verdict}")
+    print(f"\n  -> set CONFIDENCE_THRESHOLD={t:.2f} in backend/.env")
+    return j
+
+
 def main() -> int:
     args = parse_args()
 
@@ -160,17 +238,23 @@ def main() -> int:
     elif args.clean:
         clean_images = gather_images(Path(args.clean), args.limit)
 
+    clean_results: list[list[float]] = []
+    defective_results: list[list[float]] = []
+
     if clean_images:
-        per_image = run(model, clean_images, args.imgsz, args.device, lowest)
+        clean_results = run(model, clean_images, args.imgsz, args.device, lowest)
         report("CLEAN SURFACES — every box here is a false positive",
-               per_image, thresholds, clean=True)
+               clean_results, thresholds, clean=True)
 
     if args.defective:
         images = gather_images(Path(args.defective), args.limit)
         if images:
-            per_image = run(model, images, args.imgsz, args.device, lowest)
+            defective_results = run(model, images, args.imgsz, args.device, lowest)
             report("DEFECTIVE SURFACES — every miss here is a false negative",
-                   per_image, thresholds, clean=False)
+                   defective_results, thresholds, clean=False)
+
+    if clean_results and defective_results:
+        report_separation(clean_results, defective_results, thresholds)
 
     print(
         "\nNote: 'detection rate' is per-image, not per-defect — it counts "

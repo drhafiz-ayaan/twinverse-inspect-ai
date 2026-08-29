@@ -396,6 +396,28 @@ MODEL_WEIGHTS=/abs/path/to/ml/weights/defect-detector.pt uvicorn app.main:app
 
 `train.py` **exits rather than falling back to CPU** if CUDA is unavailable. A run that silently trains on CPU for a week is the same failure as [D-002](#d-002--windows-nvidia-driver-was-critically-outdated) wearing a different hat.
 
+### Check before you commit an hour
+
+```bash
+python ml/quick_check.py --data ml/datasets/crack-merged/data.yaml --clean-from-empty-labels ml/datasets/concrete-bridge-defect
+```
+
+Trains a small model on a subsample for a few epochs, then runs the full clean-vs-defective test. **Roughly two minutes instead of an hour.**
+
+It reports one number — **separation**, the best achievable margin between detection rate and false-positive rate across thresholds (Youden's J). 0.0 means the model cannot distinguish cracked concrete from clean concrete at any threshold; 1.0 is perfect.
+
+| Separation | Meaning |
+|---|---|
+| < 0 | Inconclusive — model detects nothing yet, train longer |
+| < 0.15 | Unusable — do not spend an hour on this configuration |
+| < 0.35 | Poor — will embarrass you on clean surfaces |
+| 0.35–0.55 | Marginal — demoable with a carefully chosen threshold |
+| > 0.55 | Decent or better |
+
+**The D-016 baseline scored 0.258 after a full hour.** That is the bar any new configuration has to clear.
+
+The negative case matters as much as the rest: a model that has not yet learned to fire produces no detections and scores 0, identical to one firing at random. Those need opposite responses — "train longer" versus "abandon the approach" — so the silent case is reported separately rather than collapsed into a verdict.
+
 ---
 
 ## Development Roadmap & Effort Estimates
