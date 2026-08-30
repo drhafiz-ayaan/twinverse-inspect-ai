@@ -10,6 +10,7 @@ import {
 import { SeverityBar } from "@/components/SeverityBar";
 import { DetectionImage } from "@/components/DetectionImage";
 import { SeverityFormula } from "@/components/SeverityFormula";
+import { TwinViewerClient } from "@/components/TwinViewerClient";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,16 @@ export default async function InspectionPage({
           </div>
         </section>
       )}
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold">
+          Digital Twin v1{" "}
+          <span className="font-normal text-slate-500">
+            — marker viewer, not a reconstruction
+          </span>
+        </h2>
+        <TwinViewerClient media={media} detections={detections} />
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold">
