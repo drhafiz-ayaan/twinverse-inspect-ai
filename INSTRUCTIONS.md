@@ -119,6 +119,13 @@ docker compose down
 
 Add `-v` to that if you also want to wipe the database and stored images.
 
+**If a build behaves oddly**, install the BuildKit plugin — this machine falls
+back to Docker's deprecated legacy builder without it:
+
+```bash
+sudo apt install -y docker-buildx
+```
+
 **Two things worth knowing.** The API refuses to start if `SECRET_KEY` is
 missing or left at the built-in default — that is deliberate, so a deployment
 can never quietly run on a signing key published in this repository. And
@@ -383,6 +390,17 @@ directly, add that flag.
 
 **Tests fail with a connection error.** They run against real Postgres and
 MinIO by design. Start them: `docker start twinverse-pg twinverse-minio`.
+
+**A Docker build appears frozen with no output.** It is probably fine. Docker's
+build output is buffered when piped, and the *client* uses almost no CPU
+because the daemon does the work. Check real progress instead:
+
+```bash
+docker ps
+```
+
+A container running `pip install` means it is downloading. The inference layer
+pulls several hundred megabytes and takes a while on a first build.
 
 **Port already in use.** Something else is on 3000 or 8000:
 

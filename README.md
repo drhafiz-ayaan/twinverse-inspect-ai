@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phases 1–6 complete.** Upload API, fine-tuned crack detector, severity scoring, dashboard, PDF reports, Three.js marker viewer, and JWT auth with RBAC — 101 passing tests. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2). Remaining: Phase 7 demo prep, and the Docker stack has not been run.
+**Status:** **Phases 1–6 complete and verified.** Upload API, fine-tuned crack detector, severity scoring, dashboard, PDF reports, Three.js marker viewer, JWT auth with RBAC, and a Docker stack running end to end — 101 passing tests. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2). Remaining: Phase 7 demo preparation.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -541,10 +541,17 @@ Five services: Postgres, MinIO, a one-shot `migrate` job, the API, and the dashb
 
 `ml/weights` is mounted read-only rather than baked into the image — checkpoints are gitignored, and without the mount the service falls back to COCO weights that detect people rather than defects.
 
-**Not verified end to end.** `docker-compose-v2` is not installed on this machine despite [setup step 4](#4-core-toolchain) listing it, so the stack has never been built or run. YAML, build contexts, Dockerfile paths and the weights mount are all checked; the images are not. Install it before relying on this:
+**Verified end to end.** The stack builds and runs: all five services healthy, auth enforced, the mounted checkpoint loaded, and a full upload → detect → score → PDF cycle completed inside the containers (3 images, 10 detections, 2.2 s on CPU, every severity score re-derivable from its own row).
+
+Two bugs only surfaced by actually running it, both now fixed:
+
+- `ensure_bucket` caught `ClientError` but not `BotoCoreError`, so a *connection* failure escaped and killed API startup — defeating the "logged, not fatal" behaviour the code claimed.
+- The image shipped without torch or ultralytics. It started cleanly and reported an empty class list, meaning it served every endpoint except the one the product exists for. Inference dependencies are now a separate layer from PyTorch's CPU wheel index — see [`requirements-inference.txt`](backend/requirements-inference.txt).
+
+**Note on the builder:** `buildx` is not installed here, so Docker falls back to the deprecated legacy builder. It works, but install the plugin if builds behave oddly:
 
 ```bash
-sudo apt install -y docker-compose-v2
+sudo apt install -y docker-buildx
 ```
 
 ### CI
@@ -571,7 +578,7 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 | **3** | Severity scoring engine | 0.5 d | ✅ done |
 | **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ✅ done |
 | **5** | Three.js digital twin viewer with defect markers | 1–2 d | ✅ done |
-| **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ✅ done — compose unverified |
+| **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ✅ done |
 | **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ next |
 
 **Total: 9–14 focused working days** (~8–10 days full-time, or 2.5–3 weeks part-time).
