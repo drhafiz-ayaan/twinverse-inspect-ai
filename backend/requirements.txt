@@ -34,3 +34,6 @@ reportlab==5.0.1
 # --- Tests ---
 pytest==9.1.1
 httpx==0.28.1
+# Reads generated PDFs back so the report's limitations section cannot be
+# quietly dropped in a redesign.
+pypdf==6.16.2

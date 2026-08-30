@@ -108,6 +108,9 @@ class Detector(Protocol):
     @property
     def weights(self) -> str: ...
 
+    @property
+    def class_names(self) -> list[str]: ...
+
     def analyze_image(self, path: Path) -> AnalysisResult: ...
 
     def analyze_video(self, path: Path) -> AnalysisResult: ...
@@ -137,6 +140,23 @@ class YoloDetector:
     @property
     def weights(self) -> str:
         return self._weights
+
+    @property
+    def class_names(self) -> list[str]:
+        """The labels this checkpoint can actually emit.
+
+        Distinct from the four-class taxonomy in `DefectClass`: a model
+        fine-tuned on cracks alone can only ever report cracks, and presenting
+        the taxonomy as the model's capability would overstate it.
+        """
+        try:
+            names = self._load().names
+        except Exception:
+            logger.warning("could not read class names from %s", self._weights)
+            return []
+        if isinstance(names, dict):
+            return [str(names[k]) for k in sorted(names)]
+        return [str(n) for n in names]
 
     def _load(self):
         if self._model is None:

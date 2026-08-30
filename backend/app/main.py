@@ -12,7 +12,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import assets, detections, health, inspections, uploads
+from app.api.routers import (
+    assets,
+    detections,
+    health,
+    inspections,
+    reports,
+    uploads,
+)
 from app.core.config import settings
 from app.services import storage
 
@@ -60,6 +67,7 @@ app.include_router(assets.router, prefix=settings.api_v1_prefix)
 app.include_router(inspections.router, prefix=settings.api_v1_prefix)
 app.include_router(uploads.router, prefix=settings.api_v1_prefix)
 app.include_router(detections.router, prefix=settings.api_v1_prefix)
+app.include_router(reports.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/", include_in_schema=False)

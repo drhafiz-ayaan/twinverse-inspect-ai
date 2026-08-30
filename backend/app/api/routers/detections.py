@@ -266,10 +266,25 @@ def detector_info() -> dict[str, object]:
     Exposed because "which weights produced these boxes" is the first question
     anyone asks of a detection, and guessing from config is not good enough.
     """
+    detector = inference.active_detector()
+    raw = list(getattr(detector, "class_names", []) or [])
+
+    # What the loaded checkpoint can actually emit, after alias mapping. This
+    # is deliberately separate from the taxonomy: a model fine-tuned on cracks
+    # alone can only report cracks, and showing the four-class taxonomy as its
+    # capability would overstate what the system detects.
+    detects = sorted(
+        {m.value for m in (inference.map_class_name(n) for n in raw) if m is not None}
+    )
+
     return {
-        "weights": inference.active_detector().weights,
+        "weights": detector.weights,
         "confidence_threshold": settings.confidence_threshold,
         "video_frame_stride": settings.video_frame_stride,
         "video_max_frames": settings.video_max_frames,
+        # The full taxonomy the database and severity model support.
         "defect_classes": [c.value for c in DefectClass],
+        # The subset this checkpoint can actually produce.
+        "model_classes": raw,
+        "detects": detects,
     }

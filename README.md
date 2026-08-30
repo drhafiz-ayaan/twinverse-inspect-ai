@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phases 1–3 complete.** Upload API, fine-tuned crack detector and severity scoring, with 66 passing integration tests and end-to-end verification through the running API. Cracks only, at a measured 20% false-positive rate on clean concrete — see [Detection — Phase 2](#detection--phase-2) for what it does and does not claim. Next is Phase 4, the dashboard.
+**Status:** **Phases 1–4 complete.** Upload API, fine-tuned crack detector, severity scoring, dashboard and PDF reports — 72 passing tests, verified end to end in the browser. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2). Next is Phase 5, the Three.js viewer.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -22,6 +22,7 @@
 - [Optional: ROS2 Jazzy + Gazebo Harmonic](#optional-ros2-jazzy--gazebo-harmonic--phase-6-not-mvp)
 - [API — Phase 1](#api--phase-1)
 - [Detection — Phase 2](#detection--phase-2)
+- [Dashboard — Phase 4](#dashboard--phase-4)
 - [Development Roadmap](#development-roadmap--effort-estimates)
 - [Scope Triage](#scope-triage--what-ships-and-what-does-not)
 - [Severity Scoring Model](#severity-scoring-model)
@@ -437,6 +438,57 @@ The negative case matters as much as the rest: a model that has not yet learned 
 
 ---
 
+## Dashboard — Phase 4
+
+Next.js 16 (App Router, TypeScript, Tailwind 4) in [`frontend/`](frontend), plus PDF export from the API.
+
+### Run it
+
+```bash
+cd backend && PYTHONPATH=. uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+bash frontend/dev.sh
+```
+
+Dashboard at <http://localhost:3000>. It needs the API running; if it is not, the page says so and shows the command rather than failing blankly.
+
+### What it shows
+
+| View | Contents |
+|---|---|
+| `/` | Inspection list with asset, media count and status; the scoring model |
+| `/inspections/[id]` | Stats, severity distribution, ranked detection table, per-image overlays, PDF download |
+
+Detections are drawn as an SVG overlay with `viewBox="0 0 1 1"`, so the stored normalized boxes ([D-009](#d-009--detection-schema-lands-in-the-first-migration-bounding-boxes-are-normalized)) map straight onto the image at any rendered size with no pixel arithmetic. Hovering a detection highlights its box and shows the arithmetic behind its score.
+
+### Explainability, end to end
+
+The formula, class weights and band thresholds are **fetched from `GET /api/v1/severity/model`**, not hardcoded in the frontend — so what the dashboard shows cannot drift from what the server computes.
+
+The same discipline applies to model capability. `GET /api/v1/detector` reports three separate things: the taxonomy the database supports, the raw labels the loaded checkpoint emits, and the intersection. The UI renders the intersection, currently *"detects only crack — the other 3 defect classes in the taxonomy are not covered by this model and will not be reported even if present"*. An earlier version displayed the taxonomy as though it were the model's capability, which overstated it fourfold.
+
+### PDF reports
+
+`GET /api/v1/inspections/{id}/report.pdf` — summary, severity distribution, the formula, the fifteen highest-severity detections, and a limitations page.
+
+The limitations page is load-bearing rather than boilerplate: it states that severity is relative, that roughly one clean surface in five is flagged, that only cracks are detected, and that video counts are inflated by frame-level double counting. A test extracts the PDF text and asserts those statements are present, so a redesign cannot quietly drop them.
+
+### Two environment gotchas
+
+**Turbopack fails in this setup; the dev script uses webpack.** Next 16 defaults to Turbopack, which spawns worker processes that could not locate Node here — every page 500s with `spawning node pooled process: No such file or directory`. `next dev --webpack` works. Production builds are unaffected.
+
+**Node is symlinked into `~/.local/bin`.** nvm installs under `~/.nvm`, which a login shell picks up from `.bashrc` but non-interactive spawns do not. Since `~/.local/bin` is already on the default `PATH`, symlinking `node`, `npm` and `npx` there makes them resolvable from any process:
+
+```bash
+ln -sf ~/.nvm/versions/node/v20.20.2/bin/{node,npm,npx} ~/.local/bin/
+```
+
+Re-run that after `nvm install` of a different version — the symlinks pin one version and will not follow `nvm use`.
+
+---
+
 ## Development Roadmap & Effort Estimates
 
 Estimates assume a solo developer working with AI pair-programming assistance.
@@ -447,8 +499,8 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 | **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d | ✅ done |
 | **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ✅ done — cracks only |
 | **3** | Severity scoring engine | 0.5 d | ✅ done |
-| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ next |
-| **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ |
+| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ✅ done |
+| **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ next |
 | **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ⬜ |
 | **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ |
 
@@ -542,14 +594,14 @@ twinverse-inspect-ai/
 │   │   ├── main.py             ✅ app factory, CORS, lifespan
 │   │   ├── api/
 │   │   │   ├── deps.py         ✅ shared 404 lookups
-│   │   │   └── routers/        ✅ health, assets, inspections, uploads, detections
-│   │   │                       ⬜ reports
+│   │   │   └── routers/        ✅ health, assets, inspections, uploads,
+│   │   │                          detections, reports
 │   │   ├── core/               ✅ config          ⬜ security, JWT
 │   │   ├── db/                 ✅ base, models, session, migrations/
 │   │   ├── schemas/            ✅ asset, inspection, media, detection
-│   │   └── services/           ✅ storage, media, inference, detection
-│   │                           ⬜ severity, reporting
-│   └── tests/                  ✅ 47 integration tests
+│   │   └── services/           ✅ storage, media, inference, detection,
+│   │                              severity, reporting
+│   └── tests/                  ✅ 72 integration tests
 ├── ml/                         ◐ model training and evaluation
 │   ├── requirements.txt        ✅ torch, ultralytics, roboflow
 │   ├── fetch_dataset.py        ✅ Roboflow download + data.yaml repair
@@ -558,7 +610,12 @@ twinverse-inspect-ai/
 │   ├── datasets/               ✅ README    ⬜ data (gitignored)
 │   ├── notebooks/              ⬜
 │   └── weights/                ⬜ (gitignored — Git LFS or GitHub Releases)
-├── frontend/                   ⬜ Next.js dashboard + Three.js viewer
+├── frontend/                   ✅ Next.js 16 dashboard
+│   ├── app/                    ✅ list + inspection detail pages
+│   ├── components/             ✅ overlays, severity bar, formula card
+│   ├── lib/api.ts              ✅ typed API client
+│   └── dev.sh                  ✅ dev server with nvm's Node on PATH
+│                               ⬜ Three.js viewer (Phase 5)
 ├── infra/                      ⬜ docker-compose.yml, .github/workflows/
 ├── docs/                       ⬜
 ├── requirements.txt            ✅ aggregate of backend + ml, for one dev venv
