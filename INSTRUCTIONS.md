@@ -207,7 +207,24 @@ can ever sign in to, so the system now refuses rather than letting you.
 
 ## 6. Running an inspection end to end
 
-Everything below is also clickable in the API docs at `/docs`.
+**The quick way — one command:**
+
+```bash
+./demo.sh
+```
+
+That signs in, creates the asset, opens an inspection, uploads eight images
+from the crack test set, runs detection, waits for it to finish and prints the
+dashboard URL. Pass a number for a different image count (`./demo.sh 12`).
+Run it before you present so there is always a finished inspection on screen,
+and again live if you want to show the pipeline actually working.
+
+**Note:** the dashboard is a read-only view — there is no upload button in the
+UI. Imagery enters through the API, which is what `demo.sh` and the steps below
+do. If you would rather click than type, everything below is also a form in the
+API docs at `/docs`.
+
+**The manual way, step by step:**
 
 **1. Create an asset** — the physical structure.
 
@@ -257,9 +274,9 @@ Rehearse this. It takes about four minutes.
 ### Before you start
 
 - [ ] `docker compose ps` — all services healthy
+- [ ] `./demo.sh` run once, so an analysed inspection is already on screen
 - [ ] Signed in, dashboard open on the inspection list
-- [ ] One inspection already analysed, so you are never waiting on a progress bar
-- [ ] A second set of images ready to upload live
+- [ ] A terminal open on `./demo.sh 6` if you want to run the pipeline live
 - [ ] **PDF already downloaded** as a fallback
 - [ ] **Recorded video ready** — live demos fail; this is insurance
 
