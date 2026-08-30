@@ -97,6 +97,23 @@ class Settings(BaseSettings):
     severity_band_high: float = 0.011
     severity_band_critical: float = 0.014
 
+    # --- Auth (Phase 6) ---
+    # Signs JWTs. The default is a development placeholder and the app refuses
+    # to start with it when debug is off — see app/main.py. Generate one with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    secret_key: str = "dev-only-insecure-key-change-me"
+    access_token_expire_minutes: int = 60 * 12
+
+    # Bootstrap administrator, created at startup when no users exist. Leave
+    # the password unset in any deployed environment and create the first user
+    # deliberately instead.
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_password: str | None = None
+
+    @property
+    def secret_key_is_default(self) -> bool:
+        return self.secret_key == "dev-only-insecure-key-change-me"
+
     @property
     def allowed_content_types(self) -> tuple[str, ...]:
         return self.allowed_image_types + self.allowed_video_types

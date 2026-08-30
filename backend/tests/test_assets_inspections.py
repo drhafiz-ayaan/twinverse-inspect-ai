@@ -74,7 +74,8 @@ def test_list_inspections_includes_media_count(
 
 
 def test_deleting_asset_cascades_to_inspections(
-    client: TestClient, asset: dict, inspection: dict
+    client: TestClient, admin_client: TestClient, asset: dict, inspection: dict
 ) -> None:
-    assert client.delete(f"/api/v1/assets/{asset['id']}").status_code == 204
+    """Asset deletion is admin-only — it cascades to every inspection under it."""
+    assert admin_client.delete(f"/api/v1/assets/{asset['id']}").status_code == 204
     assert client.get(f"/api/v1/inspections/{inspection['id']}").status_code == 404

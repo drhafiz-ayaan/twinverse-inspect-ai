@@ -22,16 +22,31 @@ TEST_DSN = f"postgresql+psycopg2://postgres:devpass@localhost:5432/{TEST_DB_NAME
 
 os.environ["DATABASE_URL"] = TEST_DSN
 os.environ["S3_BUCKET"] = "twinverse-test"
+# A real (throwaway) signing key, so the suite exercises the same startup path
+# as production rather than the DEBUG escape hatch.
+os.environ["SECRET_KEY"] = "test-only-key-nGf3xQ2pLm8vTz9RwK4bYc7HdJs1AeUo"
+os.environ.pop("BOOTSTRAP_ADMIN_EMAIL", None)
+os.environ.pop("BOOTSTRAP_ADMIN_PASSWORD", None)
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 
+from app.core import security  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.db.models import User, UserRole  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services import storage  # noqa: E402
+
+# Fixed credentials for the suite's three roles.
+PASSWORD = "test-password-123"
+ROLE_EMAILS = {
+    UserRole.VIEWER: "viewer@example.com",
+    UserRole.INSPECTOR: "inspector@example.com",
+    UserRole.ADMIN: "admin@example.com",
+}
 
 
 def _recreate_test_database() -> None:
@@ -99,18 +114,83 @@ def _bucket(_database):
     client.delete_bucket(Bucket=settings.s3_bucket)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _users(_database):
+    """One account per role, created once for the whole suite.
+
+    Deliberately outside the per-test truncation: re-hashing bcrypt passwords
+    for every test would dominate the runtime for no benefit.
+    """
+    db = SessionLocal()
+    try:
+        for role, email in ROLE_EMAILS.items():
+            db.add(
+                User(
+                    email=email,
+                    hashed_password=security.hash_password(PASSWORD),
+                    full_name=role.value.title(),
+                    role=role,
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _clean_tables():
-    """Truncate between tests so each starts from a known state."""
+    """Truncate between tests so each starts from a known state.
+
+    `users` is excluded — the role accounts are session-scoped.
+    """
     yield
     with engine.begin() as conn:
         conn.execute(
             text("TRUNCATE assets, inspections, media_files, detections CASCADE")
         )
+        # Drop any users a test created, keeping the three role accounts.
+        conn.execute(
+            text("DELETE FROM users WHERE email NOT IN :keep").bindparams(
+                keep=tuple(ROLE_EMAILS.values())
+            )
+        )
+
+
+def _token(role: UserRole) -> str:
+    resp = TestClient(app).post(
+        "/api/v1/auth/login",
+        json={"email": ROLE_EMAILS[role], "password": PASSWORD},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["access_token"]
+
+
+def _client_for(role: UserRole) -> TestClient:
+    c = TestClient(app)
+    c.headers.update({"Authorization": f"Bearer {_token(role)}"})
+    return c
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(_users) -> TestClient:
+    """Default client: INSPECTOR, the role that does the day-to-day work."""
+    return _client_for(UserRole.INSPECTOR)
+
+
+@pytest.fixture
+def viewer_client(_users) -> TestClient:
+    return _client_for(UserRole.VIEWER)
+
+
+@pytest.fixture
+def admin_client(_users) -> TestClient:
+    return _client_for(UserRole.ADMIN)
+
+
+@pytest.fixture
+def anon_client() -> TestClient:
+    """No credentials at all."""
     return TestClient(app)
 
 

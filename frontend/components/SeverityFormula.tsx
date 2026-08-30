@@ -1,4 +1,5 @@
-import { api, type SeverityModel, type DetectorInfo } from "@/lib/api";
+import { type SeverityModel, type DetectorInfo } from "@/lib/api";
+import { api } from "@/lib/server-api";
 
 /**
  * The scoring model, on screen.

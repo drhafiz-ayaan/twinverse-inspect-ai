@@ -36,6 +36,47 @@ def _pg_enum(enum_cls: type[enum.Enum], name: str) -> Enum:
     )
 
 
+class UserRole(str, enum.Enum):
+    """Least privilege first: a new account can read and nothing else.
+
+    VIEWER    — read inspections, detections and reports
+    INSPECTOR — VIEWER, plus upload media and run analysis
+    ADMIN     — INSPECTOR, plus delete assets and manage users
+    """
+
+    VIEWER = "viewer"
+    INSPECTOR = "inspector"
+    ADMIN = "admin"
+
+
+# Ordered weakest to strongest so a role check is a comparison rather than a
+# set of hand-maintained membership tests.
+ROLE_RANK: dict["UserRole", int] = {
+    UserRole.VIEWER: 0,
+    UserRole.INSPECTOR: 1,
+    UserRole.ADMIN: 2,
+}
+
+
+class User(Base, TimestampMixin):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
+    full_name: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped["UserRole"] = mapped_column(
+        _pg_enum(UserRole, "user_role"), nullable=False, default=UserRole.VIEWER
+    )
+    is_active: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default="true"
+    )
+
+    __table_args__ = (Index("ix_users_email", "email"),)
+
+
 class AssetType(str, enum.Enum):
     BRIDGE = "bridge"
     BUILDING = "building"

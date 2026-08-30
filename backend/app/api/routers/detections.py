@@ -7,7 +7,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_inspection_or_404, get_media_file_or_404
+from app.api.deps import (
+    get_inspection_or_404,
+    get_media_file_or_404,
+    require_inspector,
+)
 from app.core.config import settings
 from app.db.models import DefectClass, Detection, Inspection, MediaFile
 from app.db.session import SessionLocal, get_db
@@ -31,7 +35,9 @@ router = APIRouter(tags=["detections"])
 
 @router.post("/media/{media_id}/detect", response_model=DetectionRunResult)
 def detect_media(
-    media: MediaFile = Depends(get_media_file_or_404), db: Session = Depends(get_db)
+    media: MediaFile = Depends(get_media_file_or_404),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> DetectionRunResult:
     """Run inference on one media file and return the detections.
 
@@ -97,6 +103,7 @@ def detect_inspection(
         default=False,
         description="Re-analyze media already marked processed",
     ),
+    _: object = Depends(require_inspector),
 ) -> InspectionDetectionRun:
     """Dispatch inference across an inspection's media.
 
@@ -238,6 +245,7 @@ def severity_model() -> dict[str, object]:
 def rescore_inspection(
     inspection: Inspection = Depends(get_inspection_or_404),
     db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> RescoreResult:
     """Recompute severity for stored detections without re-running inference.
 

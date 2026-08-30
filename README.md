@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phases 1–4 complete.** Upload API, fine-tuned crack detector, severity scoring, dashboard and PDF reports — 72 passing tests, verified end to end in the browser. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2). Next is Phase 5, the Three.js viewer.
+**Status:** **Phases 1–6 complete.** Upload API, fine-tuned crack detector, severity scoring, dashboard, PDF reports, Three.js marker viewer, and JWT auth with RBAC — 101 passing tests. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2). Remaining: Phase 7 demo prep, and the Docker stack has not been run.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -23,6 +23,7 @@
 - [API — Phase 1](#api--phase-1)
 - [Detection — Phase 2](#detection--phase-2)
 - [Dashboard — Phase 4](#dashboard--phase-4)
+- [Security & Deployment — Phase 6](#security--deployment--phase-6)
 - [Development Roadmap](#development-roadmap--effort-estimates)
 - [Scope Triage](#scope-triage--what-ships-and-what-does-not)
 - [Severity Scoring Model](#severity-scoring-model)
@@ -489,6 +490,75 @@ Re-run that after `nvm install` of a different version — the symlinks pin one 
 
 ---
 
+## Security & Deployment — Phase 6
+
+### Authentication
+
+JWT bearer tokens, bcrypt passwords, three ranked roles.
+
+| Role | Can |
+|---|---|
+| `viewer` | Read inspections, detections, reports |
+| `inspector` | + upload media, run analysis, create/edit assets and inspections |
+| `admin` | + delete assets, manage users |
+
+**Everything under `/api/v1` requires at least a viewer.** The baseline is applied at router registration rather than per endpoint, so a newly added route is protected by default — forgetting a decorator fails closed instead of leaking data. Only `/health` and `/auth/login` are public.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | Exchange credentials for a token |
+| `GET` | `/api/v1/auth/me` | Current user |
+| `POST` `GET` | `/api/v1/auth/users` | Create / list users — **admin only** |
+| `PATCH` | `/api/v1/auth/users/{id}` | Change role or disable — **admin only** |
+
+Decisions worth knowing:
+
+- **The role is re-read from the database on every request**, not trusted from the token. A demotion takes effect immediately rather than when the token expires.
+- **Wrong password and unknown address are indistinguishable** — same status, same body, and the password is verified even when no user matched so timing does not leak which addresses exist.
+- **The last active admin cannot be demoted or disabled**, including by themselves. Otherwise an administrator can lock everyone out of user management.
+- **Over-long passwords are rejected, not truncated.** bcrypt silently ignores input past 72 bytes, which would turn a long passphrase into a shorter effective secret without telling anyone.
+- **The API refuses to start on the default `SECRET_KEY`** unless `DEBUG=true`. A deployment running on a signing key published in this repository is worse than one that will not boot.
+
+### First admin
+
+Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`; an admin is created only while the users table is empty. Without it a fresh deployment has no way in, since every user-creation route needs an existing admin.
+
+The address is validated against the login schema before the account is written. Reserved TLDs — `.local`, `.test`, `.invalid` — are rejected by the email validator, so an unvalidated bootstrap address produces an admin **you can never sign in as**, with no obvious reason why. That is not hypothetical: it happened during development with `admin@twinverse.local`.
+
+### Dashboard sessions
+
+The browser posts credentials to the dashboard's own `/api/session` route, which stores the token in an **httpOnly** cookie. A token in `localStorage` is readable by any script on the page, so one XSS bug becomes full account compromise; an httpOnly cookie is not. Verified: `document.cookie` is empty while signed in.
+
+That means only Server Components can attach the token, which is why every data fetch happens server-side and the browser never talks to the API directly. Fetching lives in `lib/server-api.ts`; `lib/api.ts` holds only types and constants, because it is imported by Client Components and cannot pull in `next/headers`.
+
+### Docker
+
+```bash
+cd infra && SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))") docker compose up --build
+```
+
+Five services: Postgres, MinIO, a one-shot `migrate` job, the API, and the dashboard. The API waits on migrations completing successfully, so it can never serve against an unmigrated schema. Compose fails fast if `SECRET_KEY` is unset.
+
+`ml/weights` is mounted read-only rather than baked into the image — checkpoints are gitignored, and without the mount the service falls back to COCO weights that detect people rather than defects.
+
+**Not verified end to end.** `docker-compose-v2` is not installed on this machine despite [setup step 4](#4-core-toolchain) listing it, so the stack has never been built or run. YAML, build contexts, Dockerfile paths and the weights mount are all checked; the images are not. Install it before relying on this:
+
+```bash
+sudo apt install -y docker-compose-v2
+```
+
+### CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — three jobs on every push and PR:
+
+- **backend** — pytest against real Postgres and MinIO service containers, since the suite deliberately does not mock them ([D-010](#d-010--phase-1-tests-run-against-real-postgres-and-minio-not-mocks))
+- **frontend** — typecheck, lint, production build
+- **secrets** — rejects credential-shaped values in tracked files, and fails if `backend/.env` ever becomes tracked
+
+The secret scan exists because a real API key reached `.env.example` once and had to be scrubbed from history. It excludes obvious placeholders — a check that fails on its own repository gets disabled rather than fixed, so it was verified to pass clean here *and* to still catch a realistic leak.
+
+---
+
 ## Development Roadmap & Effort Estimates
 
 Estimates assume a solo developer working with AI pair-programming assistance.
@@ -500,9 +570,9 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 | **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ✅ done — cracks only |
 | **3** | Severity scoring engine | 0.5 d | ✅ done |
 | **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ✅ done |
-| **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ next |
-| **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ⬜ |
-| **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ |
+| **5** | Three.js digital twin viewer with defect markers | 1–2 d | ✅ done |
+| **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ✅ done — compose unverified |
+| **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ next |
 
 **Total: 9–14 focused working days** (~8–10 days full-time, or 2.5–3 weeks part-time).
 

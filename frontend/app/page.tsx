@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { api, type Asset, type Inspection } from "@/lib/api";
+import { redirect } from "next/navigation";
+import { type Asset, type Inspection } from "@/lib/api";
+import { api, UnauthorizedError } from "@/lib/server-api";
 import { SeverityFormula } from "@/components/SeverityFormula";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +33,8 @@ export default async function Home() {
   try {
     [assets, inspections] = await Promise.all([api.assets(), api.inspections()]);
   } catch (error) {
+    // An expired or missing session is a routing concern, not an error page.
+    if (error instanceof UnauthorizedError) redirect("/login");
     return <ApiDown message={(error as Error).message} />;
   }
 

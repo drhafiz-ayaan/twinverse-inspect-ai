@@ -21,7 +21,11 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_inspection_or_404, get_media_file_or_404
+from app.api.deps import (
+    get_inspection_or_404,
+    get_media_file_or_404,
+    require_inspector,
+)
 from app.db.models import Inspection, MediaFile
 from app.db.session import get_db
 from app.schemas.media import (
@@ -50,6 +54,7 @@ def upload_media(
     files: list[UploadFile] = File(..., description="One or more images or videos"),
     inspection: Inspection = Depends(get_inspection_or_404),
     db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> UploadResponse:
     if not files:
         raise HTTPException(
@@ -163,7 +168,9 @@ def get_media(media: MediaFile = Depends(get_media_file_or_404)) -> MediaFileWit
 
 @router.delete("/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_media(
-    media: MediaFile = Depends(get_media_file_or_404), db: Session = Depends(get_db)
+    media: MediaFile = Depends(get_media_file_or_404),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> None:
     """Removes the row and the stored object.
 

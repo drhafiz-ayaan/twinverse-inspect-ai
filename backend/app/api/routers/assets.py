@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_asset_or_404
+from app.api.deps import get_asset_or_404, require_admin, require_inspector
 from app.db.models import Asset, AssetType
 from app.db.session import get_db
 from app.schemas.asset import AssetCreate, AssetRead, AssetUpdate
@@ -15,7 +15,11 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 
 @router.post("", response_model=AssetRead, status_code=status.HTTP_201_CREATED)
-def create_asset(payload: AssetCreate, db: Session = Depends(get_db)) -> Asset:
+def create_asset(
+    payload: AssetCreate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
+) -> Asset:
     asset = Asset(**payload.model_dump())
     db.add(asset)
     db.commit()
@@ -46,6 +50,7 @@ def update_asset(
     payload: AssetUpdate,
     asset: Asset = Depends(get_asset_or_404),
     db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> Asset:
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(asset, field, value)
@@ -56,7 +61,9 @@ def update_asset(
 
 @router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_asset(
-    asset: Asset = Depends(get_asset_or_404), db: Session = Depends(get_db)
+    asset: Asset = Depends(get_asset_or_404),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_admin),
 ) -> None:
     """Deletes the asset and, by cascade, its inspections and media rows.
 

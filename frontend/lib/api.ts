@@ -6,6 +6,13 @@
  * generate them from /openapi.json instead.
  */
 
+/**
+ * Shared types and presentation constants.
+ *
+ * Deliberately free of any fetching: this module is imported by Client
+ * Components, and the server-side client reads cookies via next/headers,
+ * which cannot cross that boundary. Fetching lives in lib/server-api.ts.
+ */
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -103,32 +110,6 @@ export interface DetectorInfo {
   /** Taxonomy subset this checkpoint can actually produce. */
   detects: string[];
 }
-
-/** Fetch JSON, never cached — inspection state changes as analysis runs. */
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText} — GET ${path}`);
-  }
-  return res.json() as Promise<T>;
-}
-
-export const api = {
-  assets: () => get<Asset[]>("/assets"),
-  asset: (id: string) => get<Asset>(`/assets/${id}`),
-  inspections: () => get<Inspection[]>("/inspections"),
-  inspection: (id: string) => get<Inspection>(`/inspections/${id}`),
-  media: (inspectionId: string) =>
-    get<MediaFile[]>(`/inspections/${inspectionId}/media`),
-  detections: (inspectionId: string) =>
-    get<Detection[]>(`/inspections/${inspectionId}/detections`),
-  summary: (inspectionId: string) =>
-    get<DetectionSummary>(`/inspections/${inspectionId}/detections/summary`),
-  severityModel: () => get<SeverityModel>("/severity/model"),
-  detector: () => get<DetectorInfo>("/detector"),
-  reportUrl: (inspectionId: string) =>
-    `${API_BASE}/inspections/${inspectionId}/report.pdf`,
-};
 
 export const BAND_STYLES: Record<SeverityBand, { bg: string; text: string; dot: string }> = {
   low:      { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_inspection_or_404
+from app.api.deps import get_inspection_or_404, require_inspector
 from app.db.models import Asset, Inspection, InspectionStatus, MediaFile
 from app.db.session import get_db
 from app.schemas.inspection import (
@@ -23,7 +23,9 @@ router = APIRouter(prefix="/inspections", tags=["inspections"])
 
 @router.post("", response_model=InspectionRead, status_code=status.HTTP_201_CREATED)
 def create_inspection(
-    payload: InspectionCreate, db: Session = Depends(get_db)
+    payload: InspectionCreate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> Inspection:
     if db.get(Asset, payload.asset_id) is None:
         raise HTTPException(
@@ -79,6 +81,7 @@ def update_inspection(
     payload: InspectionUpdate,
     inspection: Inspection = Depends(get_inspection_or_404),
     db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> Inspection:
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(inspection, field, value)
@@ -91,6 +94,7 @@ def update_inspection(
 def delete_inspection(
     inspection: Inspection = Depends(get_inspection_or_404),
     db: Session = Depends(get_db),
+    _: object = Depends(require_inspector),
 ) -> None:
     db.delete(inspection)
     db.commit()

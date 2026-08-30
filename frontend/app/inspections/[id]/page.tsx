@@ -1,16 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  api,
-  BAND_ORDER,
-  BAND_STYLES,
-  type Detection,
-  type SeverityBand,
-} from "@/lib/api";
+import { notFound, redirect } from "next/navigation";
+import { BAND_STYLES, type Detection, type SeverityBand } from "@/lib/api";
+import { api, UnauthorizedError } from "@/lib/server-api";
 import { SeverityBar } from "@/components/SeverityBar";
 import { DetectionImage } from "@/components/DetectionImage";
 import { SeverityFormula } from "@/components/SeverityFormula";
 import { TwinViewerClient } from "@/components/TwinViewerClient";
+import { API_BASE } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +36,7 @@ export default async function InspectionPage({
       api.summary(id),
     ]);
   } catch (error) {
+    if (error instanceof UnauthorizedError) redirect("/login");
     if ((error as Error).message.startsWith("404")) notFound();
     throw error;
   }
@@ -79,7 +76,7 @@ export default async function InspectionPage({
             </p>
           </div>
           <a
-            href={api.reportUrl(id)}
+            href={`${API_BASE}/inspections/${id}/report.pdf`}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           >
             Download PDF report
