@@ -204,7 +204,15 @@ def report_separation(clean: list[list[float]], defective: list[list[float]],
     else:
         verdict = "STRONG"
     print(f"  verdict: {verdict}")
-    print(f"\n  -> set CONFIDENCE_THRESHOLD={t:.2f} in backend/.env")
+    if j <= 0.0:
+        # With no separation the "best" threshold is an artifact — it usually
+        # wins because both rates collapse to zero there, which is not a
+        # working configuration. Recommending it would be actively misleading.
+        print("\n  -> NO usable threshold exists. The best margin is zero or")
+        print("     negative, so any threshold trades false alarms for misses")
+        print("     one-for-one. Do not ship this model.")
+    else:
+        print(f"\n  -> set CONFIDENCE_THRESHOLD={t:.2f} in backend/.env")
     return j
 
 

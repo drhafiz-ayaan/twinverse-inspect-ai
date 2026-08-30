@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import random
 import shutil
 import sys
@@ -69,6 +70,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--clean-limit", type=int, default=94)
     p.add_argument("--defective-limit", type=int, default=150)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--tag", help="Label for this run's working directory. "
+                                 "Defaults to the dataset name. Two runs "
+                                 "sharing a tag will overwrite each other.")
     p.add_argument("--keep", action="store_true",
                    help="Keep the temporary dataset and run directory")
     return p.parse_args()
@@ -87,16 +91,38 @@ def resolve_split(data_yaml: Path, key: str) -> Path | None:
     return path if path.is_dir() else None
 
 
+def label_path_for(image: Path) -> Path:
+    """Map an image path to its YOLO label path.
+
+    Uses the same rule Ultralytics does — swap the last `/images/` segment for
+    `/labels/` — because both directory layouts are in use here:
+
+        train/images/x.jpg  ->  train/labels/x.txt   (Roboflow export)
+        images/train/x.jpg  ->  labels/train/x.txt   (merge_datasets.py output)
+
+    Deriving it as `images_dir.parent / "labels"` only handles the first, and
+    silently yields empty labels for the second — which trains a model on
+    images with no annotations and looks like a bad model rather than a bug.
+    """
+    parts = str(image)
+    sa, sb = f"{os.sep}images{os.sep}", f"{os.sep}labels{os.sep}"
+    if sa in parts:
+        parts = sb.join(parts.rsplit(sa, 1))
+    return Path(parts).with_suffix(".txt")
+
+
 def subsample(images_dir: Path, out_root: Path, split: str, n: int,
-              seed: int) -> tuple[int, int]:
-    """Symlink a random sample of images plus their labels. Returns (n, backgrounds)."""
+              seed: int) -> tuple[int, int, int]:
+    """Symlink a random sample of images plus labels.
+
+    Returns (images, backgrounds, annotations).
+    """
     ev = load_evaluate_module()
     images = ev.gather_images(images_dir)
     random.Random(seed).shuffle(images)
     chosen = images[:n]
 
-    labels_dir = images_dir.parent / "labels"
-    backgrounds = 0
+    backgrounds = annotations = 0
     for image in chosen:
         dst_img = out_root / "images" / split / image.name
         dst_img.parent.mkdir(parents=True, exist_ok=True)
@@ -104,15 +130,17 @@ def subsample(images_dir: Path, out_root: Path, split: str, n: int,
             dst_img.unlink()
         dst_img.symlink_to(image.resolve())
 
-        label = labels_dir / f"{image.stem}.txt"
+        label = label_path_for(image)
         dst_lbl = out_root / "labels" / split / f"{image.stem}.txt"
         dst_lbl.parent.mkdir(parents=True, exist_ok=True)
         content = label.read_text() if label.is_file() else ""
         dst_lbl.write_text(content)
-        if not content.strip():
+        lines = [l for l in content.splitlines() if l.strip()]
+        annotations += len(lines)
+        if not lines:
             backgrounds += 1
 
-    return len(chosen), backgrounds
+    return len(chosen), backgrounds, annotations
 
 
 def main() -> int:
@@ -138,13 +166,34 @@ def main() -> int:
     elif isinstance(names, list) and names:
         class_name = names[0]
 
-    work = QUICK_ROOT / "dataset"
+    # Per-run directory so concurrent or repeated checks cannot clobber each
+    # other's sampled dataset and checkpoint.
+    tag = args.tag or data_yaml.parent.name
+    run_root = QUICK_ROOT / tag
+    work = run_root / "dataset"
     if work.exists():
         shutil.rmtree(work)
 
-    n_train, bg_train = subsample(train_dir, work, "train", args.sample, args.seed)
-    n_val, bg_val = subsample(val_dir, work, "val", max(60, args.sample // 4),
-                              args.seed)
+    n_train, bg_train, ann_train = subsample(
+        train_dir, work, "train", args.sample, args.seed
+    )
+    n_val, bg_val, ann_val = subsample(
+        val_dir, work, "val", max(60, args.sample // 4), args.seed
+    )
+
+    # Guard against the failure that produced this check: silently empty
+    # labels train a model on nothing and the result reads as a bad model
+    # rather than a broken sample.
+    if ann_train == 0:
+        sys.exit(
+            f"sampled {n_train} training images but found 0 annotations.\n"
+            f"  Looked for labels beside: {train_dir}\n"
+            f"  Example expected path   : {label_path_for(next(iter(load_evaluate_module().gather_images(train_dir))))}\n"
+            "  Every label came back empty, so training would learn nothing.\n"
+            "  Check the dataset's images/ and labels/ directory layout."
+        )
+    if bg_train == n_train:
+        sys.exit(f"all {n_train} sampled training images are backgrounds")
 
     quick_yaml = work / "data.yaml"
     quick_yaml.write_text(
@@ -155,7 +204,7 @@ def main() -> int:
     print("=" * 62)
     print("QUICK CHECK — smoke test, not a prediction")
     print("=" * 62)
-    print(f"  sampled   : {n_train} train ({bg_train} backgrounds), {n_val} val")
+    print(f"  sampled   : {n_train} train ({bg_train} bg, {ann_train} annotations), {n_val} val")
     print(f"  model     : {args.model}   epochs: {args.epochs}")
     print()
 
@@ -168,7 +217,7 @@ def main() -> int:
         imgsz=args.imgsz,
         batch=args.batch,
         device=args.device,
-        project=str(QUICK_ROOT),
+        project=str(run_root),
         name="run",
         exist_ok=True,
         plots=False,
@@ -176,7 +225,7 @@ def main() -> int:
     )
 
     ev = load_evaluate_module()
-    weights = QUICK_ROOT / "run" / "weights" / "best.pt"
+    weights = run_root / "run" / "weights" / "best.pt"
     if not weights.is_file():
         sys.exit(f"training produced no checkpoint at {weights}")
 
