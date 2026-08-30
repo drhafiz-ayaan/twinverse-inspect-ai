@@ -37,6 +37,13 @@ def parse_args() -> argparse.Namespace:
                    help="Source split directories (each holding images/ and labels/)")
     p.add_argument("--val", nargs="+", required=True)
     p.add_argument("--test", nargs="*", default=[])
+    p.add_argument(
+        "--backgrounds-from", nargs="*", default=[],
+        help="Split directories to take ONLY defect-free images from (those "
+             "with an empty label file), added to train. Backgrounds carry no "
+             "annotations, so they import no labelling convention — this is "
+             "how to borrow from a dataset whose boxes would conflict.",
+    )
     p.add_argument("--class-name", default="crack",
                    help="Name for the single merged class (default: crack)")
     p.add_argument("--copy", action="store_true",
@@ -144,6 +151,26 @@ def main() -> int:
         names = ", ".join(source_tag(s) for s in sources)
         print(f"  {split:5}  {imgs:5} images  {annots:5} annotations  "
               f"{bg:4} backgrounds   <- {names}")
+
+    for src in (Path(p) for p in args.backgrounds_from):
+        if not src.is_dir():
+            sys.exit(f"backgrounds source not found: {src}")
+        tag = source_tag(src)
+        added = 0
+        for label in sorted((src / "labels").glob("*.txt")):
+            if label.stat().st_size > 0:
+                continue
+            for suffix in IMAGE_SUFFIXES:
+                image = src / "images" / f"{label.stem}{suffix}"
+                if image.is_file():
+                    stem = f"{tag}_bg__{image.stem}"
+                    link(image, out / "images" / "train" / f"{stem}{suffix}", copy=args.copy)
+                    (out / "labels" / "train" / f"{stem}.txt").write_text("")
+                    added += 1
+                    break
+        imgs, annots, bg = stats["train"]
+        stats["train"] = (imgs + added, annots, bg + added)
+        print(f"  train  +{added:4} backgrounds (no annotations)   <- {tag}")
 
     yaml_path = out / "data.yaml"
     lines = [
