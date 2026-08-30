@@ -44,3 +44,6 @@ uploads/
 Thumbs.db
 .vscode/
 .idea/
+
+# Deliverables: keep generators and outputs, not the npm tree
+deliverables/node_modules/
