@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phase 1 complete; Phase 2 pipeline complete, model not yet trained.** Environment verified ([Environment Status](#environment-status)); upload API and detection pipeline shipped with 47 passing integration tests. Inference runs on the GPU in 7 ms, but on COCO weights that do not detect defects — the remaining work is a labelled dataset and a fine-tune. See [Detection — Phase 2](#detection--phase-2) for the honest breakdown.
+**Status:** **Phases 1 and 2 complete.** Upload API and detection pipeline shipped with 51 passing integration tests, and a fine-tuned crack detector is trained and wired in — verified end to end through the API. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2) for what it does and does not claim. Next is Phase 3, severity scoring.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -345,15 +345,32 @@ Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and edit. 
 
 ## Detection — Phase 2
 
-### Honest status
+### Status — working, with stated limits
 
-**The pipeline is built, tested and running on the GPU. It does not yet detect real defects.**
+**A fine-tuned crack detector is trained, evaluated and wired into the API.** Verified end to end on 2026-08-30: three held-out images uploaded through the API produced 10 crack detections in 6.1 s, with normalized boxes and areas persisted to PostgreSQL.
 
-Inference currently loads `yolo11n.pt`, which is **COCO-pretrained** — it detects people, cars and traffic lights, not cracks. Verified on this machine: weights load, warm inference runs in **7 ms** on the RTX 3080, and the class mapper correctly discards every COCO label because none of them are defect classes. That is the pipeline working exactly as designed and finding nothing, which is the correct outcome for the wrong weights.
+Current model: `ml/weights/crack-nitw-bg.pt` — YOLOv11n fine-tuned on [D-015](#d-015--training-dataset-nitw-concrete-crack-detection-v6)'s dataset plus background images.
 
-What remains is the part the README always said was the risk: **a labelled dataset and a fine-tune**. See [`ml/datasets/README.md`](ml/datasets/README.md) — including the trap that SDNET2018, the most-cited option, is a *classification* set with no bounding boxes.
+| Metric | Value |
+|---|---|
+| mAP50 | 0.436 |
+| mAP50-95 | 0.149 |
+| **Separation** (clean vs cracked) | **0.611** — DECENT |
+| Operating point | conf **0.30** → 20.2% false positives on clean, 81.3% detection on cracked |
 
-Until `MODEL_WEIGHTS` points at a fine-tuned checkpoint, no claim about defect detection is defensible. Stating that plainly is the same discipline as [D-004](#d-004--severity-scoring-is-relative-not-absolute).
+**What this does not claim.** One defect class only — cracks. It has never seen corrosion, spalling or missing components, and `class_weight` is therefore constant at 1.0. One in five clean surfaces still draws a box. Separation was measured against 94 defect-free photographs from a single source, which is a real signal but not a broad one.
+
+The honest framing for a demo: *this finds most cracks and is wrong about clean concrete roughly a fifth of the time.* That is a useful first-pass inspection tool and not an unattended one.
+
+### How the numbers moved
+
+| Configuration | mAP50 | Separation |
+|---|---|---|
+| `yolo11s`, nitw only, 80 epochs | 0.442 | 0.258 — POOR |
+| `yolo11s`, merged datasets, 80 epochs | 0.373 | 0.000 — UNUSABLE |
+| **`yolo11n`, nitw + backgrounds, 38 epochs** | **0.436** | **0.611 — DECENT** |
+
+**mAP50 is flat across all three. Real-world usability varies by a factor of infinity.** The first and third models look interchangeable on the metric everyone reports; one fires on 51% of clean surfaces at its best operating point and the other on 20%. This is the whole argument of [D-016](#d-016--map-is-not-sufficient-evidence-false-positives-on-clean-surfaces-must-be-measured-separately) in three rows.
 
 ### Endpoints
 
@@ -428,8 +445,8 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 |---|---|---|---|
 | **0** | Ubuntu migration, drivers, toolchain, repo scaffold | 0.5–1 d | ✅ done |
 | **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d | ✅ done |
-| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ◐ pipeline done; **needs dataset + fine-tune** |
-| **3** | Severity scoring engine | 0.5 d | ⬜ |
+| **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ✅ done — cracks only |
+| **3** | Severity scoring engine | 0.5 d | ⬜ next |
 | **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ |
 | **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ |
 | **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ⬜ |
@@ -714,6 +731,20 @@ The cause is [D-015](#d-015--training-dataset-nitw-concrete-crack-detection-v6)'
 **Consequence for this project:** mAP alone is never sufficient evidence that the detector works. Every model is evaluated with `ml/evaluate.py` against held-out defect-free imagery before any claim is made about it. The 94 bridge background images are reserved for this and deliberately excluded from training so the test stays honest.
 
 Two confounds are acknowledged rather than hidden: the clean set comes from a different dataset, so part of the gap is domain shift; and those images are "clean" only because the bridge annotator drew no boxes, so a few may contain unlabelled hairline cracks. Neither explains identical median confidences.
+
+### D-017 — Smaller model, backgrounds not more data; and check before committing an hour
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+Three controlled results, each contradicting the obvious move:
+
+**Backgrounds help; the dataset they came from does not.** Merging `crack-b` wholesale drove separation to **0.000** — worse than doing nothing. Taking *only* its 120 background images lifted it from 0.406 to **0.622**. The annotated images carried a conflicting labelling convention (3.61 vs 1.93 boxes per image), and that harm outweighed the benefit of doubling the data. Backgrounds have no labels, so they import no convention — which is why `merge_datasets.py --backgrounds-from` exists.
+
+**`yolo11n` beats `yolo11s` here.** Every configuration improved on the smaller model, consistent with the train/val loss divergence measured on the first run (gap quadrupling from 0.32 to 1.30 over 80 epochs). 1197 images does not support `yolo11s`'s capacity. The final run early-stopped at epoch 38 against the baseline's 80.
+
+**The two-minute check predicted the twenty-five-minute run to within 0.011** — forecast 0.622, actual 0.611. `quick_check.py` is therefore trustworthy for triage, and the standing rule is: **run it before committing the GPU to a full run.** Two hours were spent on two full runs that a pair of two-minute checks would have redirected.
+
+A process note worth keeping: the first attempt at the background experiment returned a garbage result from a path-resolution bug in the sampler, not from the model. Empty labels trained a model on nothing, and the output read as "this configuration fails". `quick_check` now aborts loudly when a sample yields zero annotations, because a broken input that looks like a valid negative result is the most expensive kind of bug.
 
 ---
 
