@@ -13,7 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Detection, InspectionStatus, MediaFile
-from app.services import inference, storage
+from app.services import inference, severity, storage
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +53,14 @@ def run_for_media(db: Session, media: MediaFile) -> tuple[list[Detection], int, 
                 bbox_width=w,
                 bbox_height=h,
                 frame_index=raw.frame_index,
-                # Geometry is free here. class_weight, severity_score and
-                # severity_band are deliberately left null — the scoring engine
-                # is Phase 3, and writing placeholder numbers now would make
-                # unscored rows indistinguishable from scored ones.
                 normalized_area=raw.normalized_area,
             )
         )
+
+    # Phase 3: score every row as it is written, so nothing reaches the
+    # dashboard unscored.
+    for row in rows:
+        severity.apply(row)
 
     db.add_all(rows)
     media.processed = True

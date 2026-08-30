@@ -4,7 +4,7 @@
 
 > Analyze images and videos from drones, CCTV, robots, or smartphones to automatically detect infrastructure defects — cracks, corrosion, surface damage, equipment faults — assess severity, generate maintenance insights, and visualize asset health through an interactive digital twin.
 
-**Status:** **Phases 1 and 2 complete.** Upload API and detection pipeline shipped with 51 passing integration tests, and a fine-tuned crack detector is trained and wired in — verified end to end through the API. Cracks only, at a measured 20% false-positive rate on clean concrete; see [Detection — Phase 2](#detection--phase-2) for what it does and does not claim. Next is Phase 3, severity scoring.
+**Status:** **Phases 1–3 complete.** Upload API, fine-tuned crack detector and severity scoring, with 66 passing integration tests and end-to-end verification through the running API. Cracks only, at a measured 20% false-positive rate on clean concrete — see [Detection — Phase 2](#detection--phase-2) for what it does and does not claim. Next is Phase 4, the dashboard.
 **Target:** Hackathon MVP (see [Scope Triage](#scope-triage--what-ships-and-what-does-not)).
 **Repository:** `drhafiz-ayaan/twinverse-inspect-ai` (private)
 
@@ -446,8 +446,8 @@ Estimates assume a solo developer working with AI pair-programming assistance.
 | **0** | Ubuntu migration, drivers, toolchain, repo scaffold | 0.5–1 d | ✅ done |
 | **1** | Upload API — FastAPI + PostgreSQL + MinIO, image & video ingest | 1–1.5 d | ✅ done |
 | **2** | **Defect detection** — dataset prep, YOLOv11 fine-tune, video frame pipeline | **2–4 d** — critical path | ✅ done — cracks only |
-| **3** | Severity scoring engine | 0.5 d | ⬜ next |
-| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ |
+| **3** | Severity scoring engine | 0.5 d | ✅ done |
+| **4** | Dashboard + PDF report export (Next.js) | 1.5–2 d | ⬜ next |
 | **5** | Three.js digital twin viewer with defect markers | 1–2 d | ⬜ |
 | **6** | JWT auth, Docker Compose, CI, documentation | 1 d | ⬜ |
 | **7** | Demo script, pitch deck, recorded walkthrough | 1 d | ⬜ |
@@ -499,10 +499,18 @@ severity_score = normalized_area x detection_confidence x class_weight
 
 class_weight:  crack 1.0 | corrosion 0.9 | surface_damage 0.6 | missing_component 1.0
 
-Bands:  0.00-0.25 Low | 0.25-0.50 Medium | 0.50-0.75 High | 0.75-1.00 Critical
+Bands:  <0.009 Low | 0.009-0.011 Medium | 0.011-0.014 High | >0.014 Critical
 ```
 
+**The band thresholds are calibrated, not assumed.** The original proposal specified 0.25 / 0.50 / 0.75, which put **100% of 308 measured detections into Low** — a crack's bounding box covers 2–4% of the frame, so real scores land near 0.009 and the maximum observed was 0.021. The cut points above sit near the p52/p76/p94 of measured output, giving roughly 53/24/17/6 percent across the four bands. See [D-018](#d-018--severity-bands-are-calibrated-against-measured-output-not-assumed).
+
+Served live at **`GET /api/v1/severity/model`** so the dashboard renders the formula, weights and thresholds actually in force rather than a hardcoded copy that can drift. Every detection row stores its own `normalized_area`, `confidence` and `class_weight`, so any score can be re-derived by hand from its own record — which is what makes "we show the formula" an honest claim rather than a slogan.
+
+Thresholds are configuration, not model output. Change them in `.env` and `POST /api/v1/inspections/{id}/rescore` re-applies them to stored detections with no GPU time.
+
 **Stated limitation:** this produces a *relative* severity ranking within and across inspections. It does **not** output engineering units (crack width in mm), because that requires camera calibration or a known scale reference in frame. Presenting it honestly is a strength, not a weakness — inflated claims are what judges probe hardest.
+
+A second limitation now that the model exists: with **one defect class**, `class_weight` is constant at 1.0 and severity reduces in practice to `area × confidence`. The weight table is implemented and tested for all four classes, but only `crack` is reachable until the detector is trained on more.
 
 ---
 
@@ -745,6 +753,31 @@ Three controlled results, each contradicting the obvious move:
 **The two-minute check predicted the twenty-five-minute run to within 0.011** — forecast 0.622, actual 0.611. `quick_check.py` is therefore trustworthy for triage, and the standing rule is: **run it before committing the GPU to a full run.** Two hours were spent on two full runs that a pair of two-minute checks would have redirected.
 
 A process note worth keeping: the first attempt at the background experiment returned a garbage result from a path-resolution bug in the sampler, not from the model. Empty labels trained a model on nothing, and the output read as "this configuration fails". `quick_check` now aborts loudly when a sample yields zero annotations, because a broken input that looks like a valid negative result is the most expensive kind of bug.
+
+### D-018 — Severity bands are calibrated against measured output, not assumed
+
+**Date:** 2026-08-30 · **Status:** Accepted
+
+The proposal specifies bands at 0.25 / 0.50 / 0.75. Measured against 308 real detections from the trained model, **every single one fell into LOW**:
+
+| Percentile | severity_score |
+|---|---|
+| p50 | 0.0087 |
+| p75 | 0.0109 |
+| p90 | 0.0129 |
+| max | 0.0212 |
+
+The maximum score the model can produce is roughly **one twelfth** of the MEDIUM threshold. The cause is structural rather than a tuning miss: `normalized_area` for a crack's bounding box is 2–4% of the frame, and multiplying by a confidence under 1.0 can only shrink it. Scores spanning 0..1 would require defects covering most of the image.
+
+Bands are now **0.009 / 0.011 / 0.014**, near the p52/p76/p94 of measured output, producing roughly 53/24/17/6 percent across LOW/MEDIUM/HIGH/CRITICAL. Verified end to end: 12 images yielded 34 detections spread 13/9/7/5.
+
+**The formula itself is unchanged.** Only the band boundaries moved, and they are exposed as configuration rather than baked in. `POST /inspections/{id}/rescore` re-applies new thresholds to stored rows without re-running inference, because a threshold change is a config change and should not cost GPU time.
+
+Three things follow that are worth stating plainly:
+
+- These cut points are **dataset- and model-relative**. They describe how this model scores this kind of imagery. They must be recalibrated after any model change, and a "CRITICAL" here means "in the worst few percent of what this model found", not an engineering judgement.
+- This is consistent with [D-004](#d-004--severity-scoring-is-relative-not-absolute), which already committed to relative ranking. Calibrated bands make that concrete rather than contradicting it.
+- A test asserts the thresholds stay below 0.05, so a well-meaning revert to the proposal's numbers fails loudly instead of silently turning the severity band into a constant.
 
 ---
 

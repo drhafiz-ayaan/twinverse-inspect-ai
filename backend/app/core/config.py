@@ -77,6 +77,26 @@ class Settings(BaseSettings):
     video_frame_stride: int = 15
     video_max_frames: int = 300
 
+    # --- Severity bands (Phase 3) ---
+    # Cut points for LOW/MEDIUM/HIGH/CRITICAL against
+    #   severity = normalized_area x confidence x class_weight
+    #
+    # Calibrated against 308 real detections (see README D-018). The proposal's
+    # original 0.25/0.50/0.75 assume the score spans 0..1; it does not for thin
+    # defects. A crack's bounding box covers 2-4% of the frame, so scores land
+    # near 0.009 and the maximum observed was 0.021 — every detection filed as
+    # LOW, making the band useless.
+    #
+    # These cut points sit near the p52/p76/p94 of measured output, giving
+    # roughly 53/24/17/6 percent across LOW/MEDIUM/HIGH/CRITICAL.
+    #
+    # They are dataset-relative by construction, consistent with D-004: this
+    # ranks defects against each other, it does not measure them. Recalibrate
+    # after any model change, then POST /inspections/{id}/rescore.
+    severity_band_medium: float = 0.009
+    severity_band_high: float = 0.011
+    severity_band_critical: float = 0.014
+
     @property
     def allowed_content_types(self) -> tuple[str, ...]:
         return self.allowed_image_types + self.allowed_video_types

@@ -17,9 +17,12 @@ from app.schemas.detection import (
     DetectionRunResult,
     InspectionDetectionRun,
     InspectionDetectionSummary,
+    RescoreResult,
+    SeverityBandCount,
 )
 from app.services import detection as detection_svc
 from app.services import inference, storage
+from app.services import severity as severity_svc
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +189,22 @@ def inspection_detection_summary(
         .order_by(func.count(Detection.id).desc())
     ).all()
 
+    bands = db.execute(
+        select(Detection.severity_band, func.count(Detection.id))
+        .join(MediaFile, MediaFile.id == Detection.media_file_id)
+        .where(
+            MediaFile.inspection_id == inspection.id,
+            Detection.severity_band.is_not(None),
+        )
+        .group_by(Detection.severity_band)
+    ).all()
+
+    stats = db.execute(
+        select(func.max(Detection.severity_score), func.avg(Detection.severity_score))
+        .join(MediaFile, MediaFile.id == Detection.media_file_id)
+        .where(MediaFile.inspection_id == inspection.id)
+    ).one()
+
     return InspectionDetectionSummary(
         inspection_id=inspection.id,
         media_total=media_total,
@@ -194,6 +213,49 @@ def inspection_detection_summary(
         by_class=[
             DefectClassCount(defect_class=cls, count=count) for cls, count in rows
         ],
+        by_severity=[
+            SeverityBandCount(severity_band=b, count=count) for b, count in bands
+        ],
+        max_severity_score=float(stats[0]) if stats[0] is not None else None,
+        mean_severity_score=float(stats[1]) if stats[1] is not None else None,
+    )
+
+
+@router.get("/severity/model", tags=["detections"])
+def severity_model() -> dict[str, object]:
+    """The scoring model as data, for the dashboard to render.
+
+    Served rather than hardcoded in the frontend so what the UI shows cannot
+    drift from what the server actually computes. README D-004 commits to
+    showing the formula on screen; this is what makes that honest.
+    """
+    return severity_svc.describe()
+
+
+@router.post(
+    "/inspections/{inspection_id}/rescore", response_model=RescoreResult
+)
+def rescore_inspection(
+    inspection: Inspection = Depends(get_inspection_or_404),
+    db: Session = Depends(get_db),
+) -> RescoreResult:
+    """Recompute severity for stored detections without re-running inference.
+
+    Band thresholds are configuration, not model output, so changing them must
+    not require an hour of GPU time to take effect.
+    """
+    stmt = (
+        select(Detection)
+        .join(MediaFile, MediaFile.id == Detection.media_file_id)
+        .where(MediaFile.inspection_id == inspection.id)
+    )
+    rows = list(db.scalars(stmt))
+    for row in rows:
+        severity_svc.apply(row)
+    db.commit()
+    return RescoreResult(
+        rescored=len(rows),
+        detail=f"recomputed severity for {len(rows)} detection(s)",
     )
 
 

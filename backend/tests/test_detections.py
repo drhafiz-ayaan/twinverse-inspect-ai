@@ -141,10 +141,14 @@ def test_detect_image_persists_rows(
     assert top["confidence"] == pytest.approx(0.91)
     assert top["bbox_x"] == pytest.approx(0.10)
     assert top["bbox_width"] == pytest.approx(0.30)
-    # Geometry is computed at detection time; scoring is Phase 3.
+    # Geometry, then scoring — Phase 3 populates severity as rows are written,
+    # so nothing reaches the dashboard unscored. (This assertion previously
+    # required severity to be null, which was the Phase 2 invariant D-013
+    # described; D-018's scoring engine deliberately supersedes it.)
     assert top["normalized_area"] == pytest.approx(0.12)
-    assert top["severity_score"] is None
-    assert top["severity_band"] is None
+    assert top["class_weight"] == 1.0
+    assert top["severity_score"] == pytest.approx(0.12 * 0.91 * 1.0)
+    assert top["severity_band"] is not None
 
     assert stub.calls == [("image", stub.calls[0][1])]
     assert stub.calls[0][0] == "image"

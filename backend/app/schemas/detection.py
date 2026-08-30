@@ -55,9 +55,24 @@ class DefectClassCount(BaseModel):
     count: int
 
 
+class SeverityBandCount(BaseModel):
+    severity_band: SeverityBand
+    count: int
+
+
 class InspectionDetectionSummary(BaseModel):
     inspection_id: uuid.UUID
     media_total: int
     media_processed: int
     detection_total: int
     by_class: list[DefectClassCount]
+    by_severity: list[SeverityBandCount] = []
+    max_severity_score: float | None = None
+    mean_severity_score: float | None = None
+
+
+class RescoreResult(BaseModel):
+    """Outcome of recomputing severity over stored detections."""
+
+    rescored: int
+    detail: str
