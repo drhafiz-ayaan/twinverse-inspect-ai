@@ -1,26 +1,290 @@
 @import "tailwindcss";
 
+/*
+  TwinVerse Inspect AI — visual system
+  ------------------------------------
+  Dark-first "control room" aesthetic: deep slate, cyan/teal instrumentation,
+  severity colours reserved exclusively for severity. Nothing decorative is
+  allowed to use rose or amber, so a red glow on screen always means a real
+  finding rather than styling.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-0: #070b14;
+  --bg-1: #0b1220;
+  --bg-2: #111a2e;
+  --line: #1e2b44;
+  --line-soft: #17233a;
+  --text-0: #e8eef8;
+  --text-1: #9fb0cc;
+  --text-2: #64748b;
+
+  --accent: #22d3ee;
+  --accent-2: #6366f1;
+  --accent-glow: rgba(34, 211, 238, 0.35);
+
+  --sev-low: #10b981;
+  --sev-medium: #f59e0b;
+  --sev-high: #f97316;
+  --sev-critical: #f43f5e;
+
+  --glass: rgba(17, 26, 46, 0.62);
+  --glass-line: rgba(120, 160, 220, 0.14);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg-0);
+  --color-foreground: var(--text-0);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ---------------------------------------------------------------- ambience */
+
+/* Slow drifting aurora behind everything. Fixed and non-interactive so it
+   never intercepts pointer events or shifts layout. */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 70vw;
+  height: 70vw;
+  border-radius: 9999px;
+  filter: blur(120px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.aurora::before {
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.32), transparent 62%);
+  top: -22vw;
+  left: -14vw;
+  animation: drift-a 26s ease-in-out infinite alternate;
+}
+
+.aurora::after {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.30), transparent 62%);
+  bottom: -28vw;
+  right: -16vw;
+  animation: drift-b 32s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(8vw, 6vw, 0) scale(1.16); }
+}
+@keyframes drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-7vw, -5vw, 0) scale(1); }
+}
+
+/* Faint engineering grid — reads as instrumentation, not decoration. */
+.grid-veil {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(120, 160, 220, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 220, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 40%, transparent 100%);
+}
+
+/* ------------------------------------------------------------------- glass */
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-radius: 16px;
+  position: relative;
+}
+
+/* Hairline highlight along the top edge — the detail that reads as "lit". */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(160, 200, 255, 0.5),
+    transparent
+  );
+}
+
+.glass-hover {
+  transition: transform 0.32s cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 0.32s ease, box-shadow 0.32s ease;
+}
+.glass-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 12px 40px -12px rgba(34, 211, 238, 0.28);
+}
+
+/* ------------------------------------------------------------------ motion */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* Stagger helpers so a list resolves in sequence rather than all at once. */
+.d1 { animation-delay: 0.06s; }
+.d2 { animation-delay: 0.12s; }
+.d3 { animation-delay: 0.18s; }
+.d4 { animation-delay: 0.24s; }
+.d5 { animation-delay: 0.30s; }
+.d6 { animation-delay: 0.36s; }
+
+@keyframes sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+
+/* Light travelling across a progress bar once it has filled. */
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.42),
+    transparent
+  );
+  animation: sweep 2.6s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.85); opacity: 0.75; }
+  70%  { transform: scale(1.9);  opacity: 0; }
+  100% { transform: scale(1.9);  opacity: 0; }
+}
+
+.pulse-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: pulse-ring 2.1s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+
+@keyframes scanline {
+  0%   { top: 0%; opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Sweeps once over an image while its detections are being read. */
+.scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    transparent
+  );
+  box-shadow: 0 0 14px 2px var(--accent-glow);
+  animation: scanline 2.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(160, 200, 255, 0.09),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+/* ------------------------------------------------------------------ detail */
+
+.text-gradient {
+  background: linear-gradient(96deg, var(--accent) 0%, var(--accent-2) 60%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hairline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--line),
+    transparent
+  );
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-1); }
+::-webkit-scrollbar-thumb {
+  background: #23324e;
+  border-radius: 8px;
+  border: 2px solid var(--bg-1);
+}
+::-webkit-scrollbar-thumb:hover { background: #2f4064; }
+
+/* Respect the OS setting. Everything above is decorative; none of it carries
+   information that is lost when the motion stops. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .aurora { opacity: 0.35; }
 }

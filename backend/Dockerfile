@@ -1,9 +1,15 @@
 # TwinVerse Inspect AI — API service
 #
-# Installs backend/requirements.txt only, which deliberately excludes torch and
-# ultralytics (README's requirements split). The service loads a checkpoint at
-# runtime rather than training, and bundling the CUDA stack would add several
-# GB to this image for code it never calls.
+# Two dependency layers:
+#   requirements.txt            the web service
+#   requirements-inference.txt  torch + ultralytics, from the CPU index
+#
+# The detect endpoints run the model in-process, so inference deps are not
+# optional. They are installed from PyTorch's CPU wheel index because the
+# default Linux wheels bundle ~2.5 GB of CUDA runtime that a container without
+# a GPU can never use.
+#
+# For GPU inference: drop --extra-index-url below and run with `--gpus all`.
 
 FROM python:3.12-slim AS base
 
@@ -22,9 +28,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Copy requirements first so dependency layers survive source changes.
-COPY requirements.txt .
+# Requirements first, so dependency layers survive source changes. Inference
+# deps are a separate layer: they are far larger and change far less often.
+COPY requirements.txt requirements-inference.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-inference.txt \
+        --extra-index-url https://download.pytorch.org/whl/cpu
 
 COPY . .
 

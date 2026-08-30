@@ -56,7 +56,10 @@ async def lifespan(app: FastAPI):
     try:
         storage.ensure_bucket()
         logger.info("object storage ready: bucket %s", settings.s3_bucket)
-    except storage.StorageError:
+    except Exception:
+        # Never fatal. The readiness probe reports it and the app still serves
+        # reads; an orchestrator restarting on a slow dependency is worse than
+        # a degraded instance that recovers on its own.
         logger.exception("object storage unavailable at startup")
 
     _bootstrap_admin()

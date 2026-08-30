@@ -1,21 +1,46 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { BAND_STYLES, type Detection, type SeverityBand } from "@/lib/api";
+import { BAND_STROKE, type Detection, type SeverityBand } from "@/lib/api";
 import { api, UnauthorizedError } from "@/lib/server-api";
 import { SeverityBar } from "@/components/SeverityBar";
 import { DetectionImage } from "@/components/DetectionImage";
 import { SeverityFormula } from "@/components/SeverityFormula";
+import { AnimatedCounter } from "@/components/ui/Motion";
 import { TwinViewerClient } from "@/components/TwinViewerClient";
 import { API_BASE } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({
+  label,
+  value,
+  decimals = 0,
+  suffix = "",
+  hint,
+  accent = "var(--accent)",
+  delay = "d1",
+}: {
+  label: string;
+  value: number | null;
+  decimals?: number;
+  suffix?: string;
+  hint?: string;
+  accent?: string;
+  delay?: string;
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold tabular-nums">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
+    <div className={`glass glass-hover rise ${delay} px-5 py-4`}>
+      <p className="text-[10.5px] uppercase tracking-[0.14em] text-[var(--text-2)]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums" style={{ color: accent }}>
+        {value === null ? (
+          "—"
+        ) : (
+          <AnimatedCounter value={value} decimals={decimals} suffix={suffix} />
+        )}
+      </p>
+      {hint && <p className="mt-0.5 text-[11px] text-[var(--text-2)]">{hint}</p>}
     </div>
   );
 }
@@ -56,20 +81,20 @@ export default async function InspectionPage({
   const unprocessed = media.filter((m) => !m.processed).length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-9">
       <div>
         <Link
           href="/"
-          className="text-xs text-slate-500 transition hover:text-slate-900 dark:hover:text-slate-200"
+          className="text-xs text-[var(--text-2)] transition hover:text-cyan-300"
         >
           ← All inspections
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-3xl font-semibold tracking-tight">
               {inspection.title}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--text-1)]">
               {asset?.name ?? "unknown asset"}
               {asset?.location ? ` · ${asset.location}` : ""} ·{" "}
               <span className="capitalize">{inspection.status}</span>
@@ -77,7 +102,7 @@ export default async function InspectionPage({
           </div>
           <a
             href={`${API_BASE}/inspections/${id}/report.pdf`}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,0.7)] transition hover:brightness-110"
           >
             Download PDF report
           </a>
@@ -87,21 +112,34 @@ export default async function InspectionPage({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Media analysed"
-          value={`${summary.media_processed}/${summary.media_total}`}
-          hint={unprocessed > 0 ? `${unprocessed} pending` : undefined}
+          value={summary.media_processed}
+          suffix={`/${summary.media_total}`}
+          hint={unprocessed > 0 ? `${unprocessed} pending` : "all processed"}
+          delay="d1"
         />
-        <Stat label="Detections" value={String(summary.detection_total)} />
+        <Stat
+          label="Detections"
+          value={summary.detection_total}
+          accent="#a78bfa"
+          delay="d2"
+        />
         <Stat
           label="Highest severity"
-          value={summary.max_severity_score?.toFixed(5) ?? "—"}
+          value={summary.max_severity_score}
+          decimals={5}
+          accent="#f43f5e"
+          delay="d3"
         />
         <Stat
           label="Mean severity"
-          value={summary.mean_severity_score?.toFixed(5) ?? "—"}
+          value={summary.mean_severity_score}
+          decimals={5}
+          accent="#f59e0b"
+          delay="d4"
         />
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <section className="glass rise d4 p-5">
         <h2 className="text-sm font-semibold">Severity distribution</h2>
         <div className="mt-4">
           <SeverityBar counts={summary.by_severity} />
@@ -109,12 +147,12 @@ export default async function InspectionPage({
       </section>
 
       {worst.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-sm font-semibold">Highest-severity detections</h2>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <section className="rise d5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-1)]">Highest-severity detections</h2>
+          <div className="glass overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs text-slate-500 dark:border-slate-800">
+                <tr className="border-b border-white/5 text-left text-[10.5px] uppercase tracking-wider text-[var(--text-2)]">
                   <th className="px-4 py-2.5 font-medium">Class</th>
                   <th className="px-4 py-2.5 font-medium">Source</th>
                   <th className="px-4 py-2.5 text-right font-medium">Conf.</th>
@@ -130,19 +168,19 @@ export default async function InspectionPage({
                   return (
                     <tr
                       key={d.id}
-                      className="border-b border-slate-100 last:border-0 dark:border-slate-800/60"
+                      className="border-b border-white/[0.04] transition hover:bg-white/[0.03] last:border-0"
                     >
                       <td className="px-4 py-2.5 capitalize">
                         {d.defect_class.replace("_", " ")}
                       </td>
-                      <td className="max-w-[220px] truncate px-4 py-2.5 text-slate-500">
+                      <td className="max-w-[220px] truncate px-4 py-2.5 text-[var(--text-2)]">
                         {src?.original_filename ?? "—"}
                         {d.frame_index !== null && ` @${d.frame_index}`}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
                         {d.confidence.toFixed(3)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--text-2)]">
                         {d.normalized_area?.toFixed(4)}
                       </td>
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">
@@ -150,7 +188,8 @@ export default async function InspectionPage({
                       </td>
                       <td className="px-4 py-2.5">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${BAND_STYLES[band].bg} ${BAND_STYLES[band].text}`}
+                          className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide"
+                          style={{ color: BAND_STROKE[band], background: `${BAND_STROKE[band]}1a`, boxShadow: `inset 0 0 0 1px ${BAND_STROKE[band]}44` }}
                         >
                           {band}
                         </span>
@@ -165,9 +204,9 @@ export default async function InspectionPage({
       )}
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-1)]">
           Digital Twin v1{" "}
-          <span className="font-normal text-slate-500">
+          <span className="font-normal normal-case text-[var(--text-2)]">
             — marker viewer, not a reconstruction
           </span>
         </h2>
@@ -175,18 +214,18 @@ export default async function InspectionPage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-1)]">
           Media{" "}
-          <span className="font-normal text-slate-500">
+          <span className="font-normal normal-case text-[var(--text-2)]">
             — hover a detection to highlight its box
           </span>
         </h2>
         {media.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700">
+          <div className="glass p-10 text-center text-sm text-[var(--text-2)]">
             No media uploaded to this inspection yet.
           </div>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {media.map((m) => (
               <DetectionImage
                 key={m.id}

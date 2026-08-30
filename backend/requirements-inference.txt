@@ -1,0 +1,22 @@
+# Inference dependencies for the API container — CPU only.
+#
+# The detect endpoints run the model in-process, so the service genuinely needs
+# torch and ultralytics. Splitting them out of backend/requirements.txt was
+# wrong for this architecture: the image built without them started fine and
+# then reported an empty class list, meaning it could serve every endpoint
+# except the one the product exists for.
+#
+# Installed from PyTorch's CPU index. The default Linux wheels pull the full
+# CUDA runtime (~2.5 GB of nvidia-* packages) which a container without a GPU
+# can never use. CPU-only keeps the image around a quarter of that size.
+#
+# Install with:
+#   pip install -r requirements-inference.txt \
+#       --extra-index-url https://download.pytorch.org/whl/cpu
+#
+# For GPU inference, build with the default index instead and give the
+# container a device (`--gpus all`).
+
+torch==2.13.0
+torchvision==0.28.0
+ultralytics==8.4.135

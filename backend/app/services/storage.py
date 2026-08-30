@@ -12,9 +12,16 @@ from typing import BinaryIO
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import settings
+
+# ClientError covers responses the endpoint actually returned. BotoCoreError
+# covers never reaching it at all — DNS failure, refused connection, timeout.
+# Catching only the first lets a connection error escape as an unhandled
+# exception, which killed API startup under Compose before MinIO was accepting
+# S3 calls.
+STORAGE_ERRORS = (ClientError, BotoCoreError)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +53,8 @@ def ensure_bucket(bucket: str | None = None) -> None:
         code = exc.response.get("Error", {}).get("Code", "")
         if code not in {"404", "NoSuchBucket", "NotFound"}:
             raise StorageError(f"cannot reach bucket {bucket!r}: {exc}") from exc
+    except BotoCoreError as exc:
+        raise StorageError(f"cannot reach object storage: {exc}") from exc
 
     try:
         client.create_bucket(Bucket=bucket)
@@ -55,6 +64,8 @@ def ensure_bucket(bucket: str | None = None) -> None:
         code = exc.response.get("Error", {}).get("Code", "")
         if code not in {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}:
             raise StorageError(f"cannot create bucket {bucket!r}: {exc}") from exc
+    except BotoCoreError as exc:
+        raise StorageError(f"cannot create bucket {bucket!r}: {exc}") from exc
 
 
 def build_object_key(inspection_id: uuid.UUID, filename: str) -> str:
@@ -85,7 +96,7 @@ def upload_fileobj(fileobj: BinaryIO, key: str, content_type: str,
         get_client().upload_fileobj(
             fileobj, bucket, key, ExtraArgs={"ContentType": content_type}
         )
-    except ClientError as exc:
+    except STORAGE_ERRORS as exc:
         raise StorageError(f"upload of {key!r} failed: {exc}") from exc
 
 
@@ -98,7 +109,7 @@ def download_to_path(key: str, destination: str, bucket: str | None = None) -> N
     bucket = bucket or settings.s3_bucket
     try:
         get_client().download_file(bucket, key, destination)
-    except ClientError as exc:
+    except STORAGE_ERRORS as exc:
         raise StorageError(f"download of {key!r} failed: {exc}") from exc
 
 
@@ -107,7 +118,7 @@ def delete_object(key: str, bucket: str | None = None) -> None:
     bucket = bucket or settings.s3_bucket
     try:
         get_client().delete_object(Bucket=bucket, Key=key)
-    except ClientError:
+    except STORAGE_ERRORS:
         logger.warning("could not delete orphaned object %s", key, exc_info=True)
 
 
@@ -121,5 +132,5 @@ def presigned_url(key: str, expires_in: int | None = None,
             Params={"Bucket": bucket, "Key": key},
             ExpiresIn=expires_in,
         )
-    except ClientError as exc:
+    except STORAGE_ERRORS as exc:
         raise StorageError(f"cannot presign {key!r}: {exc}") from exc
