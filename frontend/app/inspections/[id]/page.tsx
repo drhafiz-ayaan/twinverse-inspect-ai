@@ -7,7 +7,6 @@ import { DetectionImage } from "@/components/DetectionImage";
 import { SeverityFormula } from "@/components/SeverityFormula";
 import { AnimatedCounter } from "@/components/ui/Motion";
 import { TwinViewerClient } from "@/components/TwinViewerClient";
-import { API_BASE } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +100,7 @@ export default async function InspectionPage({
             </p>
           </div>
           <a
-            href={`${API_BASE}/inspections/${id}/report.pdf`}
+            href={`/api/inspections/${id}/report`}
             className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,0.7)] transition hover:brightness-110"
           >
             Download PDF report
