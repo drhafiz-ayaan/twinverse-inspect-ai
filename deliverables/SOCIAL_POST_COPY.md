@@ -30,11 +30,11 @@ We also measured what it gets wrong, and we say so inside the product: it finds
 cracks and only cracks, and it flags about one clean surface in five. It is a
 screening tool, not an engineering assessment.
 
-The number on the card is the honest one. On photographs resembling its
-training data it finds about 81% of cracks. We tested it against a public
-dataset from an unrelated source that it had never seen, and it found 63%. That
-is the figure we quote, because an accuracy number that only holds on familiar
-images is not one anyone can plan around.
+About that 81%: it is the number on imagery like its training data, and the
+card says so. We also tested it against three public datasets from unrelated
+sources it had never seen, where it found 63%, 13% and 8%. All four numbers are
+published. A tool that only works on photographs like the ones it was built
+from is worth knowing about before anyone relies on it.
 
 Built in a week by three of us at Bano Qabil, Alkhidmat Foundation Pakistan.
 
@@ -52,8 +52,8 @@ severity, and shows its working.
 No black box: every score on screen is three numbers multiplied together, and
 all three are displayed.
 
-We also published what it gets wrong — including that it drops from 81% to 63%
-on a dataset it had never seen.
+We also published what it gets wrong — including that 81% on our own data
+becomes 63%, 13% and 8% on three datasets it had never seen.
 
 🔗 [link]
 
@@ -72,8 +72,8 @@ It also tells you what it cannot do. It finds cracks and only cracks, and it
 flags about one clean surface in five. It is a screening tool, not a
 replacement for an engineer.
 
-The 63% on the card is deliberate: that is what it scored on a dataset it had
-never seen, not the friendlier number from our own test images.
+The 81% on the card is labelled "on familiar imagery" for a reason: on three
+datasets it had never seen it scored 63%, 13% and 8%. We publish all four.
 
 Three of us. One week. Built at Bano Qabil.
 

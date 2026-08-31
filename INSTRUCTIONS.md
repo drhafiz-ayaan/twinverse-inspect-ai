@@ -420,17 +420,33 @@ frame.
 **"About one clean surface in five gets flagged."** Measured against 94
 defect-free photographs. It is a screening tool that errs toward flagging.
 
-**"It is weaker on imagery unlike its training data — we measured it."** On
-the held-out split of its own dataset it finds about **4 cracks in 5**. On
-`crack-bphdr`, a third-party dataset from an unrelated source that contributed
-nothing to training, that drops to **63%** — roughly 3 in 5. Separation falls
-from 0.611 to 0.432.
+**"It is much weaker on imagery unlike its training data — we measured it on
+three other datasets."** This is the strongest thing you can say in the whole
+pitch. Say it deliberately, with the numbers:
 
-This is the strongest thing you can say in the whole pitch, so say it
-deliberately: most teams quote the number from their own test split and have
-never checked. Volunteering the weaker one, with the dataset named, is what
-separates a measured system from a demo. The fix is more varied training data,
-not a threshold — the sweep shows no threshold that recovers it.
+| dataset | trained on? | cracks found |
+|---|---|---|
+| nitw-crack | yes | **81%** |
+| crack-bphdr | no | **63%** |
+| bridge-defect | no | **13%** |
+| crack-b | no | **8%** |
+
+Most teams quote the first row and have never run the others. Quoting all four,
+unprompted, is what separates a measured system from a demo.
+
+**Do not say "63% on unseen data" and stop there** — that is the best of the
+three unseen numbers, and a judge who asks "which dataset?" will find the other
+two. Say instead: *"On imagery like its training set it finds about four cracks
+in five. On three datasets it had never seen, that ranges from 63% down to 8%.
+It is a screening tool tuned to one kind of concrete photography, and we can
+show you exactly where it stops working."*
+
+If asked what fixes it: more varied training data, not a threshold. We tried —
+see [D-020](README.md#d-020--three-independent-sources-and-what-that-cost-to-find-out).
+Training on all three sources lifted recall to 79/96/90% but tripled the
+false-positive rate to 65%, and the best repair we found still sat at 27.7%
+against the current 20.2%. That model is in `ml/weights/crack-hardneg.pt` and
+was **not** deployed, on a criterion fixed before the result was known.
 
 **"Severity is a ranking, not a measurement."** It does not output crack width
 in millimetres — that needs camera calibration or a scale reference in frame.

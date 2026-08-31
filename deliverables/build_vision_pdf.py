@@ -376,14 +376,16 @@ def build():
         ("104", "automated tests", INK),
         ("6.1s", "to analyse 8 images", INK),
         ("7ms", "per image on a GPU", INK),
-        ("63%", "of cracks found on unseen data", INK),
+        ("4", "datasets it was tested on", INK),
     ]))
     st.append(Spacer(1, 6))
     st.append(Paragraph(
-        "That last figure is deliberately the conservative one. On imagery resembling its training "
-        "data the detector finds about 81% of cracks; on a public dataset from an unrelated source "
-        "that it had never seen, 63%. We quote the number measured where it is hardest, because a "
-        "figure that only holds on familiar photographs is not a figure anyone can plan around.",
+        "Accuracy is quoted as a range rather than a number, because a single number would be a "
+        "choice about which dataset to mention. On imagery resembling its training data the "
+        "detector finds about <b>81%</b> of cracks. On three public datasets from unrelated "
+        "sources that it had never seen, that falls to <b>63%</b>, <b>13%</b> and <b>8%</b>. "
+        "All four are published in the technical record. A tool that only works on photographs "
+        "like the ones it was built from is worth knowing about before it is relied on.",
         S["body"]))
 
     # Roadmap sits here, after status, rather than after the limitations page.
@@ -420,11 +422,11 @@ def build():
         ("Roughly one clean surface in five gets flagged.",
          "Measured against 94 photographs of undamaged concrete. It is a screening tool and it "
          "errs toward flagging — a human reviews everything it raises."),
-        ("It is weaker on imagery unlike its training data.",
-         "On a third-party dataset it had never seen, the detection rate falls from about 81% to "
-         "63% — roughly three cracks in five rather than four. The false-alarm rate does not "
-         "change; only recall does. More varied training data is the fix, and no confidence "
-         "threshold substitutes for it."),
+        ("It is much weaker on imagery unlike its training data.",
+         "Tested against three third-party datasets it had never seen, the detection rate falls "
+         "from about 81% to 63%, 13% and 8%. It is tuned to one kind of concrete photography. "
+         "More varied training data is the fix, not a confidence threshold — we tried, and the "
+         "attempt tripled the false-alarm rate, so it was not shipped."),
         ("Severity is a ranking, not a measurement.",
          "It tells you which crack to look at first. It does not tell you how wide the crack is "
          "in millimetres — that needs camera calibration or a physical scale in the frame."),

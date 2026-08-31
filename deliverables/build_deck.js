@@ -358,12 +358,12 @@ function dot(slide, x, y, color, size = 0.13) {
   const s = pres.addSlide();
   base(s);
   eyebrow(s, "The number most teams never check");
-  title(s, "Then we tested it on a dataset\nit had never seen.", 0.98, { h: 1.5, fontSize: 32 });
+  title(s, "Then we tested it on three datasets\nit had never seen.", 0.98, { h: 1.5, fontSize: 32 });
 
   s.addText(
     "Every accuracy figure above came from our own dataset's held-out split — different photographs, "
-    + "but the same cameras and the same walls. So we ran it against crack-bphdr, a public benchmark "
-    + "from an unrelated source that contributed nothing to training.",
+    + "but the same cameras and the same walls. So we ran it against three public datasets from "
+    + "unrelated sources, none of which contributed anything to training.",
     { x: M, y: 2.32, w: 11.6, h: 0.8, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 13.5, color: MUTED, lineSpacingMultiple: 1.1 },
   );
@@ -371,17 +371,24 @@ function dot(slide, x, y, color, size = 0.13) {
   s.addChart(
     pres.ChartType.bar,
     [
-      { name: "Our own test split", labels: ["Cracks found", "Separation"], values: [0.810, 0.611] },
-      { name: "Unseen dataset", labels: ["Cracks found", "Separation"], values: [0.634, 0.432] },
+      // All four sources, not the flattering one. Quoting only crack-bphdr
+      // would be picking the best of the three unseen results, and the first
+      // judge to ask "which dataset?" finds the other two.
+      {
+        name: "Cracks found",
+        labels: ["nitw-crack\n(ours)", "crack-bphdr", "bridge-defect", "crack-b"],
+        values: [0.813, 0.634, 0.126, 0.077],
+      },
     ],
     {
       x: M, y: 3.3, w: 7.2, h: 2.75,
-      barDir: "col", barGapWidthPct: 60,
-      chartColors: [DIM, CYAN],
-      showTitle: false, showLegend: true, legendPos: "t", legendColor: MUTED, legendFontSize: 10,
+      barDir: "col", barGapWidthPct: 55,
+      chartColors: [CYAN, DIM, DIM, DIM],
+      varyColors: true,
+      showTitle: false, showLegend: false,
       showValue: true, dataLabelPosition: "outEnd", dataLabelColor: TEXT,
-      dataLabelFontSize: 10, dataLabelFormatCode: "0.000",
-      catAxisLabelColor: MUTED, catAxisLabelFontSize: 11,
+      dataLabelFontSize: 11, dataLabelFormatCode: "0%",
+      catAxisLabelColor: MUTED, catAxisLabelFontSize: 10,
       valAxisLabelColor: DIM, valAxisLabelFontSize: 9,
       valAxisMaxVal: 1.0, valGridLine: { color: LINE, size: 1 },
       catGridLine: { style: "none" }, plotArea: { fill: { color: BG } },
@@ -395,10 +402,10 @@ function dot(slide, x, y, color, size = 0.13) {
     fontFace: B, fontSize: 15, bold: true, color: TEXT,
   });
   s.addText(
-    "On unfamiliar imagery it finds roughly 3 cracks in 5, not 4 in 5. The false-alarm rate does "
-    + "not move — only recall does.\n\n"
-    + "No threshold recovers it. The fix is more varied training data, and we know that because "
-    + "we swept the thresholds and looked.",
+    "Four in five cracks on imagery like our training set. On three we had never seen, between "
+    + "63% and 8%.\n\n"
+    + "We could have shown you only the 63%. We are showing you all four, because the honest "
+    + "claim is that this is tuned to one kind of concrete photography.",
     { x: M + 7.9, y: 3.95, w: 3.6, h: 2.0, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 11.5, color: MUTED, lineSpacingMultiple: 1.12 },
   );
@@ -480,7 +487,7 @@ function dot(slide, x, y, color, size = 0.13) {
   const limits = [
     ["Cracks only", "One defect class. It has never seen corrosion or spalling and will not report them."],
     ["1 in 5 clean surfaces flagged", "Measured against 94 defect-free photographs. It errs toward flagging."],
-    ["63% on unfamiliar imagery", "Versus 81% on imagery like its training data. Measured, not estimated."],
+    ["8-63% on unfamiliar imagery", "Versus 81% on imagery like its training data. Three unseen datasets, all published."],
     ["Severity is relative", "It ranks which crack to look at first. It does not measure width in millimetres."],
     ["The 3D view is illustrative", "Marker positions come from capture order, not surveyed coordinates."],
     ["Video counts are inflated", "Frames are analysed independently, so one crack can be counted many times."],
@@ -546,7 +553,7 @@ function dot(slide, x, y, color, size = 0.13) {
     fontFace: B, fontSize: 14.5, bold: true, color: TEXT,
   });
   s.addText(
-    "18 architectural decisions are written down with their reasoning — including the ones we got wrong and had to reverse.\n\n" +
+    "20 architectural decisions are written down with their reasoning — including the ones we got wrong, and one we had to publicly reverse after re-checking it.\n\n" +
     "A dataset that looked ideal and turned out unusable. A merge that made the model worse. A metric that hid a failure for an hour.\n\n" +
     "All of it is in the repository.",
     { x: M + 7.9, y: 3.1, w: 3.6, h: 3.1, isTextBox: true, margin: 0,

@@ -942,6 +942,55 @@ A methodological note, and a repeat of [D-015](#d-015--training-dataset-nitw-con
 
 ---
 
+### D-020 — Three independent sources, and what that cost to find out
+
+**Date:** 2026-08-31 · **Status:** Accepted — **the retrained model was not deployed**
+
+[D-019](#d-019--measured-on-a-third-party-dataset-the-model-has-never-seen-it-is-weaker-than-our-own-test-set-says) established that one dataset's test split says little about behaviour elsewhere. This entry is what happened when we acted on it, and it ends with the new model being rejected.
+
+**First, the benchmark got wider.** [`ml/benchmark.py`](ml/benchmark.py) scores a checkpoint against every source's held-out split at once. Run against the shipped model, `crack-nitw-bg.pt`:
+
+| source | trained on? | detection | false positives | separation |
+|---|---|---|---|---|
+| nitw-crack | yes | 81.3% | 20.2% | 0.611 |
+| crack-bphdr | **no** | 63.4% | 20.2% | 0.432 |
+| crack-b | **no** | 7.7% | 20.2% | 0.002 |
+| bridge-defect | **no** | 12.6% | 20.2% | 0.010 |
+
+The 63% quoted in D-019 was the *best* of the unseen numbers. On two other sources the shipped model is effectively blind. **Reporting one unseen dataset is barely better than reporting none.**
+
+**Then two of the four datasets turned out to be the wrong format.** `crack-bphdr` and `crack-b` are instance-segmentation exports — polygon rows, not boxes — despite both being listed as object detection. Ultralytics trains on them silently, reading the first two vertices as `cx cy w h`. This retroactively explains [D-017](#d-017--smaller-model-backgrounds-not-more-data-and-check-before-committing-an-hour)'s "conflicting labelling convention": there was no convention conflict, only a format bug. [`ml/seg_to_box.py`](ml/seg_to_box.py) converts them; `crack-b` alone yields 3,694 valid boxes over 1,809 genuinely cracked images.
+
+**Training on all three sources traded precision for recall, badly.** 6,615 images, 12,499 annotations:
+
+| | nitw | bphdr | crack-b | false positives |
+|---|---|---|---|---|
+| shipped | 81.3% | 63.4% | 7.7% | 20.2% |
+| three-source | 79.1% | 96.4% | 89.7% | **64.9%** |
+
+Recall improved on every source. The false-positive rate tripled, and no confidence threshold recovered it. The cause was dilution: the background count stayed at 120 while the training set grew five-fold, so backgrounds fell from 9% to 1.8% — and D-017 already measured backgrounds as the thing holding false positives down.
+
+**Not all backgrounds are equal, and that took a wasted run to learn.** [`ml/mine_backgrounds.py`](ml/mine_backgrounds.py) crops defect-free regions from annotated images. Crops taken from the crack datasets are *trivially* negative — the shipped model flags 1.0% of them, against 20.2% on the real clean set — and 1,200 of them moved the false-positive rate from 64.9% to 61.7%. Crops taken from `concrete-bridge-defect`'s annotated images contain the joints, edges and shadows that actually cause false alarms; the shipped model flags **12.0%** of those. The measured effect on nitw-crack:
+
+| backgrounds | false positives | separation |
+|---|---|---|
+| 120 (1.8%) | 64.9% | 0.142 |
+| + 1,200 easy crops | 61.7% | 0.161 |
+| + 848 hard crops | 43.6% | 0.285 |
+| + 3,950 hard crops | **27.7%** | 0.297 |
+
+**And it still was not good enough to ship.** The criterion was fixed before the final numbers were known: deploy only if mean separation across all four sources beats 0.264 *and* the false-positive rate is at most 25%. The best candidate, `crack-hardneg.pt`, reached a mean of **0.420** — comfortably the best model by that measure, and far more robust across sources (crack-b 0.002 → 0.634) — but held **27.7%** false positives, and the sweep offers no threshold that fixes it: at 21.3% false positives its recall collapses to 29.3%. It also gave up a great deal on the source the demo actually uses, 81.3% → 51.1%.
+
+So `crack-nitw-bg.pt` stays deployed. `crack-hardneg.pt` is kept in `ml/weights/` because it is the better model for imagery unlike our training data, and a future run with more clean structural imagery should beat both.
+
+Three things worth keeping from this:
+
+- **A pre-committed acceptance criterion is what makes a negative result possible.** Written down before the numbers, 27.7% is a rejection. Written down after, it is a rounding error away from 25% and a paragraph of justification.
+- **`quick_check.py` is not trustworthy outside the size it was calibrated for.** It scored this configuration UNUSABLE and said DO NOT LAUNCH; its few-epoch sample was tuned against 1,300-image datasets and this one is 11,697. It also over-predicted the three-source run at 0.473. Its standing rule now carries that caveat.
+- **The false-positive figure above is in-domain.** The hard negatives were mined from `concrete-bridge-defect`'s annotated images, and the false-positive rate is measured on that same dataset's 94 clean images. The images are disjoint; the domain is not. For a site the model has never seen, read it as optimistic.
+
+---
+
 ## Backup & Repository
 
 **Done — 2026-08-30.** This section previously read "Pre-Migration Checklist" and described work to do *before* wiping Windows. The migration happened first and the backup did not, so the planning artifacts survived on a single disk with no remote copy for a period. That gap is now closed.

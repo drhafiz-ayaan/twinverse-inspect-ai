@@ -163,11 +163,13 @@ def build(w: int, h: int, name: str, *, compact: bool):
 
     # --- stats strip -------------------------------------------------------
     sy = (py0 + panel_h + int(unit * 0.055)) if compact else (y + int(unit * 0.055))
-    # The accuracy figure is the one measured on a dataset the model has never
-    # seen, not the friendlier number from our own test split. A card is the
-    # first thing a stranger reads; putting the softer figure here and the
-    # honest one in the deck would be exactly backwards.
-    stats = [("63%", "cracks found\non unseen data"), ("7ms", "per image"),
+    # Labelled "on familiar imagery" rather than left bare. There is no single
+    # honest accuracy number here: the model scores 81% on imagery like its
+    # training set and 63%, 13% and 8% on three it had never seen. A card has
+    # room for one figure, so the figure is qualified and the range goes in the
+    # caption copy — quoting an unseen number would mean picking which of the
+    # three to show, and that choice is the dishonest part.
+    stats = [("81%", "cracks found\non familiar imagery"), ("7ms", "per image"),
              ("104", "tests passing"), ("3", "person team")]
     col = text_w / len(stats)
     nf = font("bold", int(unit * 0.040))
