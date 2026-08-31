@@ -207,24 +207,30 @@ can ever sign in to, so the system now refuses rather than letting you.
 
 ## 6. Running an inspection end to end
 
-**The quick way — one command:**
+**In the dashboard — this is what to show a judge.**
+
+Click **+ New inspection**. Name the structure, pick a type and location,
+choose your images, and press **Upload and analyse**. One panel runs the whole
+chain — creates the asset, opens the inspection, uploads, starts detection and
+polls until it settles — with the current stage and a progress bar on screen.
+It lands you on the finished inspection.
+
+Point the file picker at `ml/datasets/nitw-crack/test/images` if you need
+imagery that reliably contains cracks.
+
+**From the terminal — one command:**
 
 ```bash
 ./demo.sh
 ```
 
-That signs in, creates the asset, opens an inspection, uploads eight images
-from the crack test set, runs detection, waits for it to finish and prints the
-dashboard URL. Pass a number for a different image count (`./demo.sh 12`).
-Run it before you present so there is always a finished inspection on screen,
-and again live if you want to show the pipeline actually working.
+Same chain, no clicking: eight images from the crack test set, then it prints
+the dashboard URL. Pass a number for a different count (`./demo.sh 12`). Run it
+before you present so a finished inspection is already on screen — then use the
+dashboard panel live, and you have a fallback if the live run misbehaves.
 
-**Note:** the dashboard is a read-only view — there is no upload button in the
-UI. Imagery enters through the API, which is what `demo.sh` and the steps below
-do. If you would rather click than type, everything below is also a form in the
-API docs at `/docs`.
-
-**The manual way, step by step:**
+**Step by step, if you want to show the API itself.** Everything below is also
+a runnable form in the docs at `/docs`.
 
 **1. Create an asset** — the physical structure.
 
@@ -276,7 +282,8 @@ Rehearse this. It takes about four minutes.
 - [ ] `docker compose ps` — all services healthy
 - [ ] `./demo.sh` run once, so an analysed inspection is already on screen
 - [ ] Signed in, dashboard open on the inspection list
-- [ ] A terminal open on `./demo.sh 6` if you want to run the pipeline live
+- [ ] A folder of images ready for a live run through **+ New inspection**
+- [ ] `./demo.sh 6` in a spare terminal as the fallback if that run misbehaves
 - [ ] **PDF already downloaded** as a fallback
 - [ ] **Recorded video ready** — live demos fail; this is insurance
 
@@ -286,8 +293,11 @@ Rehearse this. It takes about four minutes.
 and walk pipelines with clipboards. It is slow, dangerous and inconsistent.
 Do not open with the model architecture.
 
-**2. Show the dashboard (45s).** Inspection list, then open one. Point at the
-severity distribution — critical findings first.
+**2. Run one live (45s).** **+ New inspection**, name the structure, drop in a
+folder of photographs, **Upload and analyse**. Talk over the progress bar —
+that is upload, detection and severity scoring happening in front of them.
+Then let it land on the finished inspection and point at the severity
+distribution, critical findings first.
 
 **3. Show a detection (60s).** Hover a detection in the media panel; its box
 lights up on the image. Then hover the score: the arithmetic appears —
