@@ -180,10 +180,26 @@ def build(w: int, h: int, name: str, *, compact: bool):
         d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=5,
                             outline=colour, width=max(2, w // 430))
         label = band.upper()
-        tw = d.textlength(label, font=lf)
-        d.rounded_rectangle([bx, by - (h // 48), bx + tw + 13, by - 2],
+        # Size the pill from the glyphs it has to hold. It was a fixed fraction
+        # of image height while the text scaled with width, so on the landscape
+        # crop 15px type sat in an 11px pill and the letters hung out of it.
+        tb = d.textbbox((0, 0), label, font=lf)
+        tw, th = tb[2] - tb[0], tb[3] - tb[1]
+        pad_x, pad_y = 7, 4
+        tag_h = th + pad_y * 2
+
+        # Badges sit above their box, except where that would push them off the
+        # top of the panel — the topmost box starts 2% down, which is less than
+        # a badge's height once the panel is short, and CRITICAL ended up
+        # straddling the panel border. There it tucks inside the box instead.
+        tag_top = by - tag_h - 2
+        if tag_top < py0 + 2:
+            tag_top = by + 3
+
+        d.rounded_rectangle([bx, tag_top, bx + tw + pad_x * 2, tag_top + tag_h],
                             radius=4, fill=colour)
-        d.text((bx + 6, by - (h // 48) + 2), label, font=lf, fill=(10, 14, 22))
+        d.text((bx + pad_x - tb[0], tag_top + pad_y - tb[1]), label,
+               font=lf, fill=(10, 14, 22))
 
     # --- wordmark ---------------------------------------------------------
     # Fonts scale with the SHORTER side and vertical positions advance by
@@ -214,8 +230,12 @@ def build(w: int, h: int, name: str, *, compact: bool):
 
     # --- stats strip -------------------------------------------------------
     sy = py0 + panel_h + int(unit * 0.055)
-    stats = [("81%", "of cracks found"), ("7ms", "per image"),
-             ("101", "tests passing"), ("3", "person team")]
+    # The accuracy figure is the one measured on a dataset the model has never
+    # seen, not the friendlier number from our own test split. A card is the
+    # first thing a stranger reads; putting the softer figure here and the
+    # honest one in the deck would be exactly backwards.
+    stats = [("63%", "cracks found\non unseen data"), ("7ms", "per image"),
+             ("104", "tests passing"), ("3", "person team")]
     col = (w - pad * 2) / len(stats)
     nf = font("bold", int(unit * 0.040))
     lf2 = font("regular", int(unit * 0.020))
@@ -223,11 +243,18 @@ def build(w: int, h: int, name: str, *, compact: bool):
         x = pad + col * i
         d.text((x, sy), big, font=nf, fill=TEXT)
         nb = d.textbbox((0, 0), big, font=nf)
-        d.text((x, sy + (nb[3] - nb[1]) + int(unit * 0.014)), label,
-               font=lf2, fill=DIM)
+        ly0 = sy + (nb[3] - nb[1]) + int(unit * 0.014)
+        # Labels wrap on an explicit newline rather than running on. A single
+        # long label overflows its column and collides with the next stat —
+        # these columns are evenly divided, so there is no slack to borrow.
+        for line_no, part in enumerate(label.split("\n")):
+            lb = d.textbbox((0, 0), part, font=lf2)
+            d.text((x, ly0 + line_no * (lb[3] - lb[1] + int(unit * 0.010))),
+                   part, font=lf2, fill=DIM)
 
     # --- severity legend + credits ----------------------------------------
-    ly = sy + int(unit * 0.105)
+    # Clears two lines of stat label, not one — the accuracy label wraps.
+    ly = sy + int(unit * 0.128)
     x = pad
     lf3 = font("regular", int(unit * 0.019))
     for band, colour in SEV:
