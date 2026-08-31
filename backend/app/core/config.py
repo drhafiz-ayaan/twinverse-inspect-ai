@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # --- Object storage (MinIO / any S3-compatible endpoint) ---
     # Swapping to Alibaba Cloud OSS or AWS S3 is a change to these values only.
     s3_endpoint_url: str | None = "http://localhost:9000"
+    # Endpoint used only to sign download links for the browser. Under Compose
+    # the API reaches MinIO at http://minio:9000, a hostname that exists only on
+    # the Docker network — presigning with it produces URLs the browser cannot
+    # resolve, and every image in the dashboard fails to load. Set this to the
+    # address a browser can reach. Unset, it falls back to s3_endpoint_url,
+    # which is correct when running outside containers.
+    s3_public_endpoint_url: str | None = None
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "twinverse-inspections"

@@ -4,6 +4,7 @@ import { type Asset, type Inspection } from "@/lib/api";
 import { api, UnauthorizedError } from "@/lib/server-api";
 import { SeverityFormula } from "@/components/SeverityFormula";
 import { AnimatedCounter } from "@/components/ui/Motion";
+import { NewInspection } from "@/components/NewInspection";
 
 export const dynamic = "force-dynamic";
 
@@ -109,13 +110,17 @@ export default async function Home() {
           </span>
         </div>
 
+        <div className="mb-4">
+          <NewInspection assets={assets} />
+        </div>
+
         {inspections.length === 0 ? (
           <div className="glass p-12 text-center">
             <p className="text-sm font-medium">No inspections yet</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-[var(--text-2)]">
-              Create an asset, open an inspection against it, then upload drone
-              or phone imagery. The API docs have runnable examples for each
-              step.
+              Use <span className="text-[var(--text-1)]">New inspection</span>{" "}
+              above: name the structure, pick your imagery, and the pipeline
+              uploads, detects and scores it in one pass.
             </p>
           </div>
         ) : (

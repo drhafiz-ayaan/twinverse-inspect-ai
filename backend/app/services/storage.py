@@ -30,10 +30,10 @@ class StorageError(RuntimeError):
     """Raised when the object store cannot satisfy a request."""
 
 
-def get_client():
+def get_client(endpoint_url: str | None = None):
     return boto3.client(
         "s3",
-        endpoint_url=settings.s3_endpoint_url,
+        endpoint_url=endpoint_url or settings.s3_endpoint_url,
         aws_access_key_id=settings.s3_access_key,
         aws_secret_access_key=settings.s3_secret_key,
         region_name=settings.s3_region,
@@ -124,10 +124,18 @@ def delete_object(key: str, bucket: str | None = None) -> None:
 
 def presigned_url(key: str, expires_in: int | None = None,
                   bucket: str | None = None) -> str:
+    """Sign a time-limited download link for the browser.
+
+    Signed against the *public* endpoint, not the one the API talks to. The
+    SigV4 signature covers the Host header, so the link must be signed with the
+    host the browser will actually send — signing with the Docker-internal
+    `minio:9000` yields a URL that resolves nowhere outside the container
+    network.
+    """
     bucket = bucket or settings.s3_bucket
     expires_in = expires_in or settings.presign_expiry_seconds
     try:
-        return get_client().generate_presigned_url(
+        return get_client(settings.s3_public_endpoint_url).generate_presigned_url(
             "get_object",
             Params={"Bucket": bucket, "Key": key},
             ExpiresIn=expires_in,
