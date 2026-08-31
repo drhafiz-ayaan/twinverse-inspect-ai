@@ -311,7 +311,10 @@ Rehearse this. It takes about four minutes.
 - [ ] A folder of images ready for a live run through **+ New inspection**
 - [ ] `./demo.sh 6` in a spare terminal as the fallback if that run misbehaves
 - [ ] **PDF already downloaded** as a fallback
-- [ ] **Recorded video ready** — live demos fail; this is insurance
+- [ ] **`deliverables/demo_backup.mp4` open in a tab** — live demos fail; this
+      is the insurance. Seventy seconds, covers the whole pitch. Re-record it
+      against the current build with:
+      `python deliverables/record_demo.py`
 
 ### The four minutes
 
@@ -366,6 +369,21 @@ not worth a full run; that is what the first hour-long training achieved.
 
 ```bash
 python ml/fetch_dataset.py --url https://universe.roboflow.com/<workspace>/<project>/dataset/<version>
+```
+
+**Check the export, not the project page.** Plenty of Universe projects say
+`object-detection` and ship instance segmentation. A detection label row has
+five columns; a polygon row has many more. Ultralytics trains on either without
+complaining, reading the first two polygon vertices as a box:
+
+```bash
+awk 'NF{print NF}' ml/datasets/<set>/train/labels/*.txt | sort -n | uniq -c
+```
+
+Anything other than 5 needs converting first:
+
+```bash
+python ml/seg_to_box.py --source ml/datasets/<set> --output ml/datasets/<set>-box
 ```
 
 **Train:**
