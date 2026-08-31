@@ -11,13 +11,13 @@ live dashboard read as the same thing.
 
 from __future__ import annotations
 
-import math
-import random
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 OUT = Path(__file__).parent
+SCREENSHOT = OUT / "dashboard_screenshot.jpg"
+SCREENSHOT_SINGLE = OUT / "dashboard_screenshot_single.jpg"
 
 BG = (7, 11, 20)
 TEXT = (232, 238, 248)
@@ -71,42 +71,6 @@ def grid(draw: ImageDraw.ImageDraw, w: int, h: int, step: int = 64):
         draw.line([(0, y), (w, y)], fill=(23, 35, 58), width=1)
 
 
-def crack_path(rng: random.Random, x0, y0, x1, y1, jitter, steps=34):
-    """A jagged polyline standing in for a crack.
-
-    Perpendicular offsets rather than independent x/y jitter: a real fracture
-    wanders *across* its direction of travel. Offsetting both axes freely
-    produces the gentle rolling curve of a line chart instead.
-    """
-    dx, dy = x1 - x0, y1 - y0
-    length = math.hypot(dx, dy) or 1.0
-    nx, ny = -dy / length, dx / length   # unit normal
-    pts = []
-    drift = 0.0
-    for i in range(steps + 1):
-        t = i / steps
-        # Random walk, not independent noise, so deviations persist and the
-        # line looks like it is following a fault rather than oscillating.
-        drift = drift * 0.62 + rng.uniform(-jitter, jitter)
-        # Pinch to zero at both ends so the crack starts and stops naturally.
-        taper = math.sin(math.pi * t) ** 0.5
-        px = x0 + dx * t + nx * drift * taper
-        py = y0 + dy * t + ny * drift * taper
-        pts.append((px, py))
-    return pts
-
-
-def draw_crack(d: ImageDraw.ImageDraw, pts, max_width: float, colour):
-    """Draw a polyline whose width tapers toward both ends."""
-    n = len(pts) - 1
-    for i in range(n):
-        t = i / n
-        w = max(1.0, max_width * (math.sin(math.pi * t) ** 0.6))
-        shade = int(150 - 40 * abs(0.5 - t) * 2)
-        d.line([pts[i], pts[i + 1]],
-               fill=(shade, shade + 13, shade + 30), width=int(round(w)))
-
-
 def build(w: int, h: int, name: str, *, compact: bool):
     img = Image.new("RGBA", (w, h), (*BG, 255))
     base = ImageDraw.Draw(img)
@@ -116,90 +80,59 @@ def build(w: int, h: int, name: str, *, compact: bool):
     glow(img, int(w * 0.95), int(h * 0.98), int(min(w, h) * 0.55), CYAN, 0.22)
 
     d = ImageDraw.Draw(img)
-    rng = random.Random(7)
 
-    # --- subject: a concrete panel with a fracture and detection overlays --
-    # Drawn as an inspection *photograph* rather than a bare line. A shallow
-    # diagonal with boxes on it reads as a trend chart no matter how jagged it
-    # is; a textured panel with a steep fracture reads as concrete.
-    panel_w = int(w * 0.86)
-    panel_h = int(h * (0.30 if compact else 0.31))
-    px0 = (w - panel_w) // 2
-    py0 = int(h * (0.40 if compact else 0.375))
+    # --- subject: a real screenshot of the dashboard ------------------------
+    # This was a drawn illustration of a cracked panel. A generated picture of
+    # a crack is a claim; a screenshot of the product finding one is evidence,
+    # and it never has to be caveated. Regenerate with capture_dashboard.py.
+    #
+    # It is also the honest option: the drawing put four tidy boxes on a single
+    # clean fracture, which is a better result than the model actually gets.
+    # The square stacks text over a full-width two-up. The landscape has barely
+    # 630px of height, so a full-width panel at any usable aspect ratio leaves
+    # no room for the stats — it puts a single panel in a right-hand column
+    # instead, with all the type beside it.
+    if compact:
+        source = SCREENSHOT
+        panel_w = int(w * 0.86)
+        panel_h = int(panel_w / 2.6)       # crops the two-up to a band
+        px0 = (w - panel_w) // 2
+        py0 = int(h * 0.375)
+        text_w = w - int(w * 0.07) * 2
+    else:
+        source = SCREENSHOT_SINGLE
+        panel_w = int(w * 0.34)
+        panel_h = panel_w                  # one media panel, square
+        px0 = w - panel_w - int(w * 0.055)
+        py0 = (h - panel_h) // 2
+        text_w = px0 - int(w * 0.07) - int(w * 0.03)
 
-    panel = Image.new("RGBA", (panel_w, panel_h), (0, 0, 0, 0))
-    pd = ImageDraw.Draw(panel)
-    pd.rounded_rectangle([0, 0, panel_w - 1, panel_h - 1], radius=14,
-                         fill=(31, 38, 50, 255))
+    if not source.is_file():
+        raise SystemExit(
+            f"missing {source.name} — with the stack running, run:\n"
+            "  python deliverables/capture_dashboard.py --panel"
+        )
 
-    # Concrete speckle — enough texture to read as a surface, not a swatch.
-    for _ in range(int(panel_w * panel_h / 210)):
-        sx = rng.randrange(panel_w)
-        sy = rng.randrange(panel_h)
-        v = rng.randint(-16, 20)
-        r = rng.choice((1, 1, 1, 2))
-        pd.ellipse([sx, sy, sx + r, sy + r],
-                   fill=(46 + v, 53 + v, 66 + v, 255))
+    shot = Image.open(source).convert("RGBA")
+    # Center-crop to the panel box rather than squashing: the detection boxes
+    # are geometry, and a stretched bounding box is a wrong picture of the data.
+    shot = ImageOps.fit(shot, (panel_w, panel_h), method=Image.LANCZOS,
+                        centering=(0.5, 0.5))
 
-    # Steep fracture: near-vertical is unmistakably a crack.
-    main = crack_path(rng, panel_w * 0.30, -6,
-                      panel_w * 0.62, panel_h + 6,
-                      jitter=panel_h * 0.085, steps=40)
-    draw_crack(pd, main, max_width=max(4, w / 210), colour=None)
-    for anchor, dx_f, dy_f in ((12, 0.20, 0.20), (26, -0.16, 0.17), (32, 0.13, 0.12)):
-        ax, ay = main[anchor]
-        b = crack_path(rng, ax, ay, ax + panel_w * dx_f, ay + panel_h * dy_f,
-                       jitter=panel_h * 0.05, steps=16)
-        draw_crack(pd, b, max_width=max(2, w / 430), colour=None)
-
-    # Rounded-corner mask so the texture cannot spill past the panel edge.
     mask = Image.new("L", (panel_w, panel_h), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
         [0, 0, panel_w - 1, panel_h - 1], radius=14, fill=255)
-    img.paste(panel, (px0, py0), mask)
+    img.paste(shot, (px0, py0), mask)
 
     d.rounded_rectangle([px0, py0, px0 + panel_w, py0 + panel_h],
                         radius=14, outline=(46, 60, 88), width=2)
 
-    # Detection boxes, tracking the fracture, in the dashboard's own colours.
-    boxes = [
-        ("critical", 0.02, 0.30, 0.30),
-        ("high",     0.33, 0.26, 0.26),
-        ("medium",   0.60, 0.24, 0.22),
-        ("low",      0.82, 0.16, 0.16),
-    ]
-    lf = font("bold", max(11, w // 80))
-    for band, fy, fh, fw in boxes:
-        colour = dict(SEV)[band]
-        idx = min(len(main) - 1, int((fy + fh / 2) * len(main)))
-        cx = px0 + main[idx][0]
-        by = py0 + panel_h * fy
-        bh = panel_h * fh
-        bw = panel_w * fw
-        bx = max(px0 + 8, min(cx - bw / 2, px0 + panel_w - bw - 8))
-        d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=5,
-                            outline=colour, width=max(2, w // 430))
-        label = band.upper()
-        # Size the pill from the glyphs it has to hold. It was a fixed fraction
-        # of image height while the text scaled with width, so on the landscape
-        # crop 15px type sat in an 11px pill and the letters hung out of it.
-        tb = d.textbbox((0, 0), label, font=lf)
-        tw, th = tb[2] - tb[0], tb[3] - tb[1]
-        pad_x, pad_y = 7, 4
-        tag_h = th + pad_y * 2
-
-        # Badges sit above their box, except where that would push them off the
-        # top of the panel — the topmost box starts 2% down, which is less than
-        # a badge's height once the panel is short, and CRITICAL ended up
-        # straddling the panel border. There it tucks inside the box instead.
-        tag_top = by - tag_h - 2
-        if tag_top < py0 + 2:
-            tag_top = by + 3
-
-        d.rounded_rectangle([bx, tag_top, bx + tw + pad_x * 2, tag_top + tag_h],
-                            radius=4, fill=colour)
-        d.text((bx + pad_x - tb[0], tag_top + pad_y - tb[1]), label,
-               font=lf, fill=(10, 14, 22))
+    if compact:
+        # Caption, so nobody has to guess whether the picture is real.
+        cap = font("regular", int(min(w, h) * 0.0175))
+        d.text((px0, py0 + panel_h + int(min(w, h) * 0.014)),
+               "Actual output — detections and severity bands from the dashboard",
+               font=cap, fill=DIM)
 
     # --- wordmark ---------------------------------------------------------
     # Fonts scale with the SHORTER side and vertical positions advance by
@@ -229,14 +162,14 @@ def build(w: int, h: int, name: str, *, compact: bool):
              y, int(unit * 0.02))
 
     # --- stats strip -------------------------------------------------------
-    sy = py0 + panel_h + int(unit * 0.055)
+    sy = (py0 + panel_h + int(unit * 0.055)) if compact else (y + int(unit * 0.055))
     # The accuracy figure is the one measured on a dataset the model has never
     # seen, not the friendlier number from our own test split. A card is the
     # first thing a stranger reads; putting the softer figure here and the
     # honest one in the deck would be exactly backwards.
     stats = [("63%", "cracks found\non unseen data"), ("7ms", "per image"),
              ("104", "tests passing"), ("3", "person team")]
-    col = (w - pad * 2) / len(stats)
+    col = text_w / len(stats)
     nf = font("bold", int(unit * 0.040))
     lf2 = font("regular", int(unit * 0.020))
     for i, (big, label) in enumerate(stats):
@@ -252,9 +185,23 @@ def build(w: int, h: int, name: str, *, compact: bool):
             d.text((x, ly0 + line_no * (lb[3] - lb[1] + int(unit * 0.010))),
                    part, font=lf2, fill=DIM)
 
+    if not compact:
+        # Same caption as the square, in the gap the left column leaves between
+        # the stats and the credits. Wrapped by hand: the column is narrow and
+        # there is no text layout engine here to do it.
+        cap = font("regular", int(unit * 0.0195))
+        cy = sy + int(unit * 0.155)
+        for part in ("Actual output — detections and severity",
+                     "bands, straight from the dashboard"):
+            d.text((pad, cy), part, font=cap, fill=DIM)
+            cb = d.textbbox((0, 0), part, font=cap)
+            cy += (cb[3] - cb[1]) + int(unit * 0.014)
+
     # --- severity legend + credits ----------------------------------------
-    # Clears two lines of stat label, not one — the accuracy label wraps.
-    ly = sy + int(unit * 0.128)
+    # Clears two lines of stat label, not one — the accuracy label wraps. On the
+    # landscape the type only fills the left column, so these anchor near the
+    # bottom instead of trailing the stats and leaving the corner empty.
+    ly = sy + int(unit * 0.128) if compact else int(h * 0.70)
     x = pad
     lf3 = font("regular", int(unit * 0.019))
     for band, colour in SEV:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BAND_STROKE,
   type Detection,
@@ -25,6 +25,21 @@ export function DetectionImage({ media, detections }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // `onLoad` only fires for a load React was attached in time to observe. A
+  // cached image can finish decoding before hydration, and then the handler
+  // never runs: the image keeps `opacity-0` and the detection boxes — which
+  // render only once `loaded` is true — never appear at all. The result is an
+  // empty panel that reports no error, because nothing actually failed.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    if (img.complete) {
+      if (img.naturalWidth > 0) setLoaded(true);
+      else setFailed(true);
+    }
+  }, [media.download_url]);
 
   const active = detections.find((d) => d.id === selected) ?? null;
   const worst = detections.reduce(
@@ -62,6 +77,7 @@ export function DetectionImage({ media, detections }: Props) {
               // origin, which next/image would need explicit host config for.
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                ref={imgRef}
                 src={media.download_url}
                 alt={media.original_filename}
                 className={`block w-full transition-opacity duration-500 ${
