@@ -915,6 +915,31 @@ Three things follow that are worth stating plainly:
 
 ---
 
+### D-019 — Measured on a third-party dataset the model has never seen; it is weaker than our own test set says
+
+**Date:** 2026-08-31 · **Status:** Accepted
+
+Every number quoted up to here came from `nitw-crack`'s own test split — held out from training, but drawn from the same collection, the same cameras and the same surfaces. That measures memorisation less than it measures *distribution*. To find out whether the detector actually generalises, it was evaluated against **`university-bswxt/crack-bphdr` v2** (RF100 benchmark, public domain, 112 test images), a dataset from an unrelated source that contributed nothing to training.
+
+At the deployed threshold of 0.30:
+
+| | nitw-crack test (in-distribution) | crack-bphdr test (**unseen source**) |
+|---|---|---|
+| Detection rate | ~81% | **63.4%** |
+| False-positive rate | ~20% | 20.2% *(same 94 clean images)* |
+| Separation | 0.611 — DECENT | **0.432 — MARGINAL** |
+
+**Roughly a third of cracks are missed on imagery that does not resemble the training set**, against about a fifth on imagery that does. The false-alarm rate is unchanged, because it is measured on the same clean images in both runs — only recall degrades.
+
+Two things this changes:
+
+- **What we claim.** The honest headline is "finds about 4 in 5 cracks on imagery like its training data, closer to 3 in 5 on an unfamiliar source". Quoting the 81% alone is the kind of number that collapses the first time someone points a different camera at a different wall.
+- **What to do next.** The fix is more varied training data, not a threshold change: the sweep shows no threshold where the unseen-data separation reaches the in-distribution figure. Sweeping to 0.25 buys recall (72.3%) at a false-positive rate of 31.9% — worse separation, not better.
+
+A methodological note, and a repeat of [D-015](#d-015--training-dataset-nitw-concrete-crack-detection-v6)'s lesson: the Roboflow project advertises `object-detection`, but the v2 export is **instance segmentation** — label rows carry 29–55 polygon coordinates, not 5 box values. It is usable here only because `ml/evaluate.py` reads labels solely to distinguish empty from non-empty. Training on it would need a polygon-to-box conversion first. **Verify the export, never the project metadata.**
+
+---
+
 ## Backup & Repository
 
 **Done — 2026-08-30.** This section previously read "Pre-Migration Checklist" and described work to do *before* wiping Windows. The migration happened first and the backup did not, so the planning artifacts survived on a single disk with no remote copy for a period. That gap is now closed.

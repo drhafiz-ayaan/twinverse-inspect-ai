@@ -79,7 +79,7 @@ Create `infra/.env` (it is gitignored — never commit it):
 ```bash
 cat > .env <<'EOF'
 SECRET_KEY=paste-a-generated-key-here
-BOOTSTRAP_ADMIN_EMAIL=admin@twinverse-inspect.com
+BOOTSTRAP_ADMIN_EMAIL=you@your-real-domain.com
 BOOTSTRAP_ADMIN_PASSWORD=pick-a-real-password
 DEBUG=false
 INFERENCE_DEVICE=cpu
@@ -173,7 +173,33 @@ On first start with `BOOTSTRAP_ADMIN_*` set, an admin account is created
 automatically. It runs only while the users table is empty, so it cannot
 resurrect an account you deliberately deleted.
 
-Sign in at <http://localhost:3000> and **change that password immediately.**
+Sign in at <http://localhost:3000> with whatever you put in `backend/.env`.
+
+### Changing the admin email or password later
+
+**Editing `BOOTSTRAP_ADMIN_*` and restarting does nothing** once any user
+exists — that is the point of the empty-table rule, and it is the one part of
+this that reliably surprises people. You change the values, restart, and are
+still signing in with the old ones with no error anywhere to explain why.
+
+To apply them to a database that already has users:
+
+```bash
+cd backend && PYTHONPATH=. python scripts/sync_admin.py
+```
+
+It creates the account if the address is new, resets the password if it already
+exists, and prints what it did — never the password itself. If it finds other
+admin accounts it lists them, because **they keep their old passwords**. An
+account you have stopped using still works. Disable it:
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/auth/users/<user-id> \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+The API will refuse if it would leave no active admin.
 
 Three roles, each including the one before it:
 
@@ -196,7 +222,7 @@ Get `$TOKEN` by logging in:
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@twinverse-inspect.com","password":"your-password"}'
+  -d '{"email":"your-admin@address","password":"your-password"}'
 ```
 
 **A note on email addresses:** reserved domains like `.local`, `.test` and
@@ -375,6 +401,18 @@ frame.
 
 **"About one clean surface in five gets flagged."** Measured against 94
 defect-free photographs. It is a screening tool that errs toward flagging.
+
+**"It is weaker on imagery unlike its training data — we measured it."** On
+the held-out split of its own dataset it finds about **4 cracks in 5**. On
+`crack-bphdr`, a third-party dataset from an unrelated source that contributed
+nothing to training, that drops to **63%** — roughly 3 in 5. Separation falls
+from 0.611 to 0.432.
+
+This is the strongest thing you can say in the whole pitch, so say it
+deliberately: most teams quote the number from their own test split and have
+never checked. Volunteering the weaker one, with the dataset named, is what
+separates a measured system from a demo. The fix is more varied training data,
+not a threshold — the sweep shows no threshold that recovers it.
 
 **"Severity is a ranking, not a measurement."** It does not output crack width
 in millimetres — that needs camera calibration or a scale reference in frame.

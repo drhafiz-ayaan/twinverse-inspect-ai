@@ -6,24 +6,45 @@
 #   ./demo.sh              8 images from the crack test set
 #   ./demo.sh 12           a different number
 #
-# The dashboard has no upload control — it is a read-only view over the API —
-# so this is how imagery gets in. Run it before you present, then again live if
-# you want to show the pipeline actually working.
+# The dashboard can do this too — "+ New inspection" runs the same chain. Use
+# this to seed a finished inspection before you present, or as the fallback if
+# a live run misbehaves.
 #
 # Requires the stack to be up (infra/docker-compose.yml) and jq.
 
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Read one key out of backend/.env.
+#
+# Deliberately not `source`: the file is not shell. An unquoted value
+# containing a space — MODEL_WEIGHTS is a path under "TWINVERSE INSPECT AI" —
+# makes bash try to execute the rest of the line. pydantic-settings parses the
+# file properly, so the app never sees this; only a shell sourcing it does.
+env_value() {
+  [ -f "$HERE/backend/.env" ] || return 0
+  sed -n "s/^$1=//p" "$HERE/backend/.env" | tail -n1 \
+    | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+
 API="${API:-http://localhost:8000/api/v1}"
 DASHBOARD="${DASHBOARD:-http://localhost:3000}"
-EMAIL="${ADMIN_EMAIL:-admin@twinverse-inspect.com}"
-PASSWORD="${ADMIN_PASSWORD:-change-me-now-8chars}"
+# Credentials come from backend/.env, which is gitignored — so the real ones
+# are never committed here. Override per-run with ADMIN_EMAIL / ADMIN_PASSWORD.
+EMAIL="${ADMIN_EMAIL:-$(env_value BOOTSTRAP_ADMIN_EMAIL)}"
+PASSWORD="${ADMIN_PASSWORD:-$(env_value BOOTSTRAP_ADMIN_PASSWORD)}"
 COUNT="${1:-8}"
 
-IMAGE_DIR="ml/datasets/nitw-crack/test/images"
+IMAGE_DIR="$HERE/ml/datasets/nitw-crack/test/images"
 
 command -v jq >/dev/null || { echo "jq is required: sudo apt install -y jq"; exit 1; }
 [ -d "$IMAGE_DIR" ] || { echo "no images at $IMAGE_DIR — fetch a dataset first"; exit 1; }
+[ -n "$EMAIL" ] && [ -n "$PASSWORD" ] || {
+  echo "no credentials: set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD"
+  echo "in backend/.env, or pass ADMIN_EMAIL / ADMIN_PASSWORD."
+  exit 1
+}
 
 step() { printf '\n\033[36m▸ %s\033[0m\n' "$1"; }
 

@@ -91,3 +91,40 @@ MODEL_WEIGHTS=/abs/path/to/ml/weights/defect-detector.pt
 ```
 
 Weights are gitignored too — use Git LFS or attach them to a GitHub Release.
+
+## Datasets in use
+
+Re-fetch any of these with `ml/fetch_dataset.py`; none are stored in the repo.
+
+| Directory | Source | Role |
+|---|---|---|
+| `nitw-crack` | [research-cz7vi/nitw-concrete-crack-detection](https://universe.roboflow.com/research-cz7vi/nitw-concrete-crack-detection) v6 | Training and in-distribution test |
+| `concrete-bridge-defect` | [ycc-otptp/concrete-bridge-defect](https://universe.roboflow.com/ycc-otptp/concrete-bridge-defect) | Background (empty-label) images; the 94 clean surfaces used for false-positive rate |
+| `crack-b` | [unknown-rqyk0/concrete-crack-detection-y2y5r](https://universe.roboflow.com/unknown-rqyk0/concrete-crack-detection-y2y5r) | Merge experiment — **made the model worse**, see D-017 |
+| `crack-bphdr` | [university-bswxt/crack-bphdr](https://universe.roboflow.com/university-bswxt/crack-bphdr) v2 | **Independent hold-out.** Never trained on; used to measure generalisation in D-019 |
+
+### On `crack-bphdr`
+
+Fetch it with:
+
+```bash
+python ml/fetch_dataset.py --url https://universe.roboflow.com/university-bswxt/crack-bphdr/dataset/2
+```
+
+Then measure how the detector does on imagery it has never seen:
+
+```bash
+python ml/evaluate.py --weights ml/weights/crack-nitw-bg.pt \
+  --defective ml/datasets/crack-bphdr/test/images \
+  --clean-from-empty-labels ml/datasets/concrete-bridge-defect
+```
+
+Two caveats that matter before you reuse it:
+
+- **It is a segmentation export**, despite the project being listed as
+  object-detection. Label rows carry 29–55 polygon coordinates, not 5 box
+  values. `evaluate.py` is unaffected — it only checks whether a label file is
+  empty — but **training on it needs a polygon-to-box conversion first**.
+- **It contains no clean images** (112 of 112 test images are annotated), so it
+  can measure detection rate but not false-positive rate. Pair it with
+  `--clean-from-empty-labels` pointed at `concrete-bridge-defect`, as above.
