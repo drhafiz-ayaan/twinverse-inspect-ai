@@ -35,7 +35,10 @@ runs/
 *.engine
 
 # Media / uploads
-uploads/
+# Anchored to the repo root. Unanchored, "uploads/" matches at any depth — it
+# silently swallowed frontend/app/api/inspections/[id]/uploads/route.ts, which
+# would have left the upload endpoint out of the repo and out of the image.
+/uploads/
 *.mp4
 *.mov
 
