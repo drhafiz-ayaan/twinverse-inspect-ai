@@ -21,6 +21,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas as pdfcanvas
 from reportlab.platypus import (
     BaseDocTemplate,
+    CondPageBreak,
     Frame,
     KeepTogether,
     NextPageTemplate,
@@ -372,10 +373,34 @@ def build():
     st.append(Spacer(1, 10))
     st.append(section("WHERE IT STANDS", "A running system, not a mockup."))
     st.append(stat_row([
-        ("101", "automated tests", INK),
+        ("104", "automated tests", INK),
         ("6.1s", "to analyse 8 images", INK),
         ("7ms", "per image on a GPU", INK),
-        ("81%", "of cracks found", INK),
+        ("63%", "of cracks found on unseen data", INK),
+    ]))
+    st.append(Spacer(1, 6))
+    st.append(Paragraph(
+        "That last figure is deliberately the conservative one. On imagery resembling its training "
+        "data the detector finds about 81% of cracks; on a public dataset from an unrelated source "
+        "that it had never seen, 63%. We quote the number measured where it is hardest, because a "
+        "figure that only holds on familiar photographs is not a figure anyone can plan around.",
+        S["body"]))
+
+    # Roadmap sits here, after status, rather than after the limitations page.
+    # The limitations grew to six cards and fill their page; the roadmap trailing
+    # them spilled onto a page of its own that was otherwise blank. Status →
+    # roadmap → limitations also lets the document close on the honest note.
+    st.append(Spacer(1, 12))
+    # CondPageBreak rather than wrapping both in a KeepTogether: `section` and
+    # `card_row` each already return one, and ReportLab mis-measures a nested
+    # KeepTogether — it broke to a new page with two thirds of this one free.
+    # This asks for 45mm of room and only breaks if it genuinely is not there.
+    st.append(CondPageBreak(45 * mm))
+    st.append(section("WHAT COMES NEXT", "The honest roadmap."))
+    st.append(card_row([
+        ("Next", "More defect types. Tracking cracks across video frames so counts are real.", CYAN),
+        ("Later", "A true photogrammetric twin built from the imagery itself.", INDIGO),
+        ("Someday", "Predictive maintenance — which needs years of data that does not exist yet.", MUTED),
     ]))
 
     st.append(PageBreak())
@@ -395,6 +420,11 @@ def build():
         ("Roughly one clean surface in five gets flagged.",
          "Measured against 94 photographs of undamaged concrete. It is a screening tool and it "
          "errs toward flagging — a human reviews everything it raises."),
+        ("It is weaker on imagery unlike its training data.",
+         "On a third-party dataset it had never seen, the detection rate falls from about 81% to "
+         "63% — roughly three cracks in five rather than four. The false-alarm rate does not "
+         "change; only recall does. More varied training data is the fix, and no confidence "
+         "threshold substitutes for it."),
         ("Severity is a ranking, not a measurement.",
          "It tells you which crack to look at first. It does not tell you how wide the crack is "
          "in millimetres — that needs camera calibration or a physical scale in the frame."),
@@ -428,14 +458,6 @@ def build():
     st.append(Spacer(1, 4))
     st.append(Paragraph(
         "&ldquo;Naming a weakness costs far less than being caught by it.&rdquo;", S["quote"]))
-
-    st.append(Spacer(1, 8))
-    st.append(section("WHAT COMES NEXT", "The honest roadmap."))
-    st.append(card_row([
-        ("Next", "More defect types. Tracking cracks across video frames so counts are real.", CYAN),
-        ("Later", "A true photogrammetric twin built from the imagery itself.", INDIGO),
-        ("Someday", "Predictive maintenance — which needs years of data that does not exist yet.", MUTED),
-    ]))
 
     st.append(Spacer(1, 12))
     st.append(NextPageTemplate("closing"))

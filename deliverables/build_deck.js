@@ -216,7 +216,7 @@ function dot(slide, x, y, color, size = 0.13) {
   title(s, "Not a mockup. A running system.");
 
   const stats = [
-    ["101", "automated tests", CYAN],
+    ["104", "automated tests", CYAN],
     ["23", "endpoints", INDIGO],
     ["6.1s", "to analyse 8 images", VIOLET],
     ["7ms", "inference per image", SEV_LOW],
@@ -343,12 +343,76 @@ function dot(slide, x, y, color, size = 0.13) {
   s.addText(
     "mAP is computed only over defects that are labelled. A validation set with no clean images cannot catch a model that fires on everything.\n\n" +
     "So we tested each model against 94 defect-free photographs.\n\n" +
-    "Model A looked fine and flagged half of all clean concrete. Model C flags one in five.",
+    "Model A looked fine and flagged half of all clean concrete. Model C flags one in five.\n\n" +
+    "Then we asked the harder question: does it hold up on imagery from somewhere else?",
     { x: M + 7.9, y: 3.28, w: 3.6, h: 2.5, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 12, color: MUTED, lineSpacingMultiple: 1.12 },
   );
   s.addNotes(
-    "If a judge asks one technical question, it will probably be about evaluation. This slide is the answer.",
+    "If a judge asks one technical question, it will probably be about evaluation. This slide is the answer. Then turn the page — the next slide is the one they will remember.",
+  );
+}
+
+// ================================================= 6b. THE GENERALISATION TEST
+{
+  const s = pres.addSlide();
+  base(s);
+  eyebrow(s, "The number most teams never check");
+  title(s, "Then we tested it on a dataset\nit had never seen.", 0.98, { h: 1.5, fontSize: 32 });
+
+  s.addText(
+    "Every accuracy figure above came from our own dataset's held-out split — different photographs, "
+    + "but the same cameras and the same walls. So we ran it against crack-bphdr, a public benchmark "
+    + "from an unrelated source that contributed nothing to training.",
+    { x: M, y: 2.32, w: 11.6, h: 0.8, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 13.5, color: MUTED, lineSpacingMultiple: 1.1 },
+  );
+
+  s.addChart(
+    pres.ChartType.bar,
+    [
+      { name: "Our own test split", labels: ["Cracks found", "Separation"], values: [0.810, 0.611] },
+      { name: "Unseen dataset", labels: ["Cracks found", "Separation"], values: [0.634, 0.432] },
+    ],
+    {
+      x: M, y: 3.3, w: 7.2, h: 2.75,
+      barDir: "col", barGapWidthPct: 60,
+      chartColors: [DIM, CYAN],
+      showTitle: false, showLegend: true, legendPos: "t", legendColor: MUTED, legendFontSize: 10,
+      showValue: true, dataLabelPosition: "outEnd", dataLabelColor: TEXT,
+      dataLabelFontSize: 10, dataLabelFormatCode: "0.000",
+      catAxisLabelColor: MUTED, catAxisLabelFontSize: 11,
+      valAxisLabelColor: DIM, valAxisLabelFontSize: 9,
+      valAxisMaxVal: 1.0, valGridLine: { color: LINE, size: 1 },
+      catGridLine: { style: "none" }, plotArea: { fill: { color: BG } },
+      chartArea: { fill: { color: BG } },
+    },
+  );
+
+  card(s, M + 7.55, 3.3, 4.25, 2.75);
+  s.addText("What this means", {
+    x: M + 7.9, y: 3.52, w: 3.6, h: 0.32, isTextBox: true, margin: 0,
+    fontFace: B, fontSize: 15, bold: true, color: TEXT,
+  });
+  s.addText(
+    "On unfamiliar imagery it finds roughly 3 cracks in 5, not 4 in 5. The false-alarm rate does "
+    + "not move — only recall does.\n\n"
+    + "No threshold recovers it. The fix is more varied training data, and we know that because "
+    + "we swept the thresholds and looked.",
+    { x: M + 7.9, y: 3.95, w: 3.6, h: 2.0, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 11.5, color: MUTED, lineSpacingMultiple: 1.12 },
+  );
+
+  s.addText(
+    "We would rather tell you this than have you find it.",
+    { x: M, y: 6.4, w: 11.8, h: 0.4, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 14, italic: true, color: CYAN, align: "center" },
+  );
+  s.addNotes(
+    "Deliver this confidently. Most teams quote the number from their own test split and have never "
+    + "run this experiment. Volunteering the weaker figure, with the dataset named, is what separates "
+    + "a measured system from a demo. If asked why it drops: the training set is one collection of "
+    + "concrete from one campus. More varied data is the fix, not a threshold.",
   );
 }
 
@@ -416,28 +480,31 @@ function dot(slide, x, y, color, size = 0.13) {
   const limits = [
     ["Cracks only", "One defect class. It has never seen corrosion or spalling and will not report them."],
     ["1 in 5 clean surfaces flagged", "Measured against 94 defect-free photographs. It errs toward flagging."],
+    ["63% on unfamiliar imagery", "Versus 81% on imagery like its training data. Measured, not estimated."],
     ["Severity is relative", "It ranks which crack to look at first. It does not measure width in millimetres."],
     ["The 3D view is illustrative", "Marker positions come from capture order, not surveyed coordinates."],
     ["Video counts are inflated", "Frames are analysed independently, so one crack can be counted many times."],
     ["Not an engineering assessment", "It is a screening pass. A qualified engineer still signs off."],
   ];
+  // Three columns rather than two: the seventh limitation pushed a 2-wide grid
+  // into a fourth row that ran off the bottom of the slide.
   limits.forEach(([h, body], i) => {
-    const x = M + (i % 2) * 6.05;
-    const y = 2.62 + Math.floor(i / 2) * 1.3;
-    card(s, x, y, 5.6, 1.08);
+    const x = M + (i % 3) * 4.03;
+    const y = 2.62 + Math.floor(i / 3) * 1.4;
+    card(s, x, y, 3.75, 1.25);
     s.addText(h, {
-      x: x + 0.32, y: y + 0.14, w: 5.0, h: 0.32, isTextBox: true, margin: 0,
-      fontFace: B, fontSize: 14, bold: true, color: TEXT,
+      x: x + 0.26, y: y + 0.13, w: 3.25, h: 0.3, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 13, bold: true, color: TEXT,
     });
     s.addText(body, {
-      x: x + 0.32, y: y + 0.48, w: 5.05, h: 0.5, isTextBox: true, margin: 0,
-      fontFace: B, fontSize: 11.5, color: MUTED,
+      x: x + 0.26, y: y + 0.45, w: 3.3, h: 0.72, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 10.5, color: MUTED, lineSpacingMultiple: 1.05,
     });
   });
 
   s.addText(
     "Naming a weakness costs far less than being caught by it.",
-    { x: M, y: 6.5, w: 11.8, h: 0.35, isTextBox: true, margin: 0,
+    { x: M, y: 6.85, w: 11.8, h: 0.35, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 14, italic: true, color: CYAN, align: "center" },
   );
   s.addNotes(
@@ -541,10 +608,10 @@ function dot(slide, x, y, color, size = 0.13) {
   eyebrow(s, "What comes next");
   title(s, "The honest roadmap.");
 
-  const now = ["Crack detection at 0.611 separation", "Severity scoring and PDF reports",
+  const now = ["Crack detection, measured on unseen data", "Severity scoring and PDF reports",
                "Dashboard, 3D viewer, auth, Docker"];
-  const next = ["More defect classes — corrosion, spalling", "Cross-frame tracking so video counts are real",
-                "Segmentation instead of boxes for thin cracks"];
+  const next = ["Varied training data to close the 63/81 gap", "More defect classes — corrosion, spalling",
+                "Cross-frame tracking so video counts are real"];
   const later = ["Photogrammetric twin from the imagery itself",
                  "Predictive maintenance once trend data exists", "Live drone and robot integration"];
 
