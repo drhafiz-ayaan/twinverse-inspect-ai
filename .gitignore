@@ -41,6 +41,12 @@ runs/
 /uploads/
 *.mp4
 *.mov
+# The backup demo video is a deliverable, not incidental media — it is the
+# thing you play when the live demo fails, so it belongs in the repo. The
+# intermediate .webm does not; regenerate both with record_demo.py.
+!deliverables/demo_backup.mp4
+deliverables/demo_backup.webm
+deliverables/_video_raw/
 
 # OS / editor
 .DS_Store
