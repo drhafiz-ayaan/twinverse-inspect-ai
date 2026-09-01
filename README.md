@@ -991,6 +991,50 @@ Three things worth keeping from this:
 
 ---
 
+### D-021 — Separation was the wrong objective; the threshold now comes from a simulated survey
+
+**Date:** 2026-09-01 · **Status:** Accepted — **supersedes the deployment decision in [D-020](#d-020--three-independent-sources-and-what-that-cost-to-find-out)**
+
+Every model decision up to here was scored on **separation** — detection rate minus false-positive rate. That metric treats a missed crack and a false alarm as equally bad. In structural inspection they are not remotely equal:
+
+> A missed crack is found at the next survey, or when something fails. A false alarm costs an engineer the thirty seconds it takes to look at a photograph and dismiss it.
+
+Optimising a symmetric metric for an asymmetric problem is how D-020 ended up rejecting a model over 27.7% versus 25% false positives — a difference that, priced properly, is about four minutes of review time per survey.
+
+**What an inspection team actually needs to know** is how many real defects a survey will miss, and how many photographs somebody has to look at. [`ml/simulate_inspection.py`](ml/simulate_inspection.py) answers that: it scores known-defective and known-clean imagery once, then replays synthetic surveys at a chosen defect prevalence across a sweep of thresholds.
+
+On a 500-photograph survey at 12% prevalence, against `crack-b` — a dataset neither model was trained on when D-020 was written:
+
+| | best achievable recall | at what review cost |
+|---|---|---|
+| `crack-nitw-bg` (shipped) | **35%** | flags 414 of 500 photographs |
+| `crack-hardneg` (rejected) | **100%** | flags 299 of 500 photographs |
+
+The shipped model was not merely worse. It was **strictly dominated**: at every review budget it found fewer defects. At its most sensitive setting it missed 39 of 60 real cracks while flagging 83% of the survey. A tool that misses two cracks in three and still makes you look at most of the photographs has no operating point worth having.
+
+**The decision reverses.** `crack-hardneg.pt` is deployed. D-020's rejection stands as a record of a correct process applied to the wrong objective — the acceptance criterion was fixed in advance and honoured, which is right, but the criterion itself encoded a false equivalence.
+
+**Threshold: 0.10, chosen for worst-case recall.** Neither model wins everywhere — `crack-nitw-bg` is better on `nitw-crack`, the source it was trained on. But a deployed system does not get to choose which wall it is pointed at, so the number that matters is the worst case across every dataset measured:
+
+| confidence | nitw-crack | crack-bphdr | crack-b | bridge-defect | **worst case** | flagged |
+|---|---|---|---|---|---|---|
+| 0.05 | 90% | 99% | 100% | 61% | — | 71% |
+| **0.10** | **84%** | **98%** | **100%** | 56% | **84%** | **60%** |
+| 0.20 | 66% | 97% | 95% | 39% | 66% | 49% |
+| 0.30 | 51% | 95% | 91% | 33% | 51% | 35% |
+
+Against `crack-nitw-bg`'s worst case of 35%, that is the whole argument. `bridge-defect` is excluded from the worst case because its label class is `defect` rather than `crack`, so some of what it marks is legitimately outside this model's scope.
+
+**What it costs, stated plainly.** At 0.10 the system flags roughly **60% of photographs** in a survey. Against a manual inspection — where somebody looks at all of them, having first climbed the structure — that is a 40% reduction and no climbing, at 84–100% recall. It is not a 95%-precision instrument and should never be described as one.
+
+Three consequences recorded elsewhere in the codebase:
+
+- **`CONFIDENCE_THRESHOLD` and the severity bands are now one decision.** The bands are percentiles of output *at the operating threshold*; this model calibrates at 0.006/0.016/0.165 at conf 0.10 and ten times higher at conf 0.30, because raising the threshold discards the small low-confidence detections that fill the bottom of the distribution. Both live in `docker-compose.yml` as environment, so recalibrating is a restart rather than a rebuild.
+- **A test that pinned `severity_band_medium < 0.05` was wrong** and would have failed this legitimate recalibration. It now asserts the bands are ordered, measured, and partition correctly, without an absolute ceiling that encodes one checkpoint's scale.
+- **The evaluation story is weaker now, and the docs say so.** `crack-hardneg` trained on three of the four benchmark sources, so `bridge-defect` is the only wholly unseen one left, at 56% recall.
+
+---
+
 ## Backup & Repository
 
 **Done — 2026-08-30.** This section previously read "Pre-Migration Checklist" and described work to do *before* wiping Windows. The migration happened first and the backup did not, so the planning artifacts survived on a single disk with no remote copy for a period. That gap is now closed.

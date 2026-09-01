@@ -70,13 +70,32 @@ def test_bands_partition_the_range() -> None:
 def test_bands_are_calibrated_not_the_proposal_defaults() -> None:
     """Guards D-018 against a well-meaning revert.
 
-    The proposal's 0.25/0.50/0.75 put 100% of 308 measured detections in LOW.
-    A realistic crack score is ~0.009; if these thresholds drift back up, the
-    severity band silently becomes a constant.
+    The proposal's 0.25/0.50/0.75 put 100% of 308 measured detections in LOW,
+    because the score is a box's share of the frame times a confidence below
+    one. The guard is that the thresholds are *measured*, not round.
+
+    It deliberately does not pin an absolute ceiling. The original bands sat
+    near 0.009 because that model drew tight boxes; a model trained on
+    polygon-derived annotations draws much larger ones and calibrates near
+    0.058 — six times higher and equally correct. An earlier version of this
+    test asserted `medium < 0.05` and would have failed a legitimate
+    recalibration, which is the wrong thing for a guard to do.
     """
-    assert settings.severity_band_medium < 0.05
-    realistic = severity.score(0.021, 0.42, DefectClass.CRACK)
-    assert severity.band(realistic) is not SeverityBand.LOW or realistic < 0.009
+    m = settings.severity_band_medium
+    h = settings.severity_band_high
+    c = settings.severity_band_critical
+
+    assert 0 < m < h < c, "bands must be ordered and non-zero"
+    # The proposal's exact values, and anything in their neighbourhood: a
+    # crack's box is a few percent of a frame, so a MEDIUM cut at a quarter of
+    # the maximum possible score puts everything in LOW whatever the model.
+    assert (m, h, c) != (0.25, 0.50, 0.75)
+    assert m < 0.25, "MEDIUM this high makes the band a constant"
+
+    # Whatever the calibration, the bands must actually partition: a score at
+    # each cut point lands in the band above it.
+    assert severity.band(m) is SeverityBand.MEDIUM
+    assert severity.band(c) is SeverityBand.CRITICAL
 
 
 # --- application to rows -------------------------------------------------
@@ -90,8 +109,14 @@ def test_apply_populates_all_severity_fields() -> None:
     )
     severity.apply(d)
     assert d.class_weight == 1.0
+    # The score is the invariant — three multiplications, no configuration.
     assert d.severity_score == pytest.approx(0.012)
-    assert d.severity_band is SeverityBand.HIGH
+    # The band is not: it depends on thresholds that are recalibrated whenever
+    # the model changes. Asserting a literal band here pins the test to one
+    # checkpoint's score distribution, so assert that apply() routed the score
+    # through the configured cut points rather than what those points are.
+    assert d.severity_band is severity.band(d.severity_score)
+    assert d.severity_band is not None
 
 
 def test_apply_derives_area_when_missing() -> None:

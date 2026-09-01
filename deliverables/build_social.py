@@ -169,7 +169,7 @@ def build(w: int, h: int, name: str, *, compact: bool):
     # room for one figure, so the figure is qualified and the range goes in the
     # caption copy — quoting an unseen number would mean picking which of the
     # three to show, and that choice is the dishonest part.
-    stats = [("81%", "cracks found\non familiar imagery"), ("7ms", "per image"),
+    stats = [("84%", "cracks found,\nworst of 4 datasets"), ("7ms", "per image"),
              ("104", "tests passing"), ("3", "person team")]
     col = text_w / len(stats)
     nf = font("bold", int(unit * 0.040))

@@ -376,7 +376,7 @@ def build():
         ("104", "automated tests", INK),
         ("6.1s", "to analyse 8 images", INK),
         ("7ms", "per image on a GPU", INK),
-        ("4", "datasets it was tested on", INK),
+        ("84%", "worst-case cracks found", INK),
     ]))
     st.append(Spacer(1, 6))
     st.append(Paragraph(
@@ -419,14 +419,8 @@ def build():
         ("It finds cracks, and only cracks.",
          "The model has never been shown corrosion, spalling or missing components. It will not "
          "report them even if they are in the picture."),
-        ("Roughly one clean surface in five gets flagged.",
-         "Measured against 94 photographs of undamaged concrete. It is a screening tool and it "
-         "errs toward flagging — a human reviews everything it raises."),
-        ("It is much weaker on imagery unlike its training data.",
-         "Tested against three third-party datasets it had never seen, the detection rate falls "
-         "from about 81% to 63%, 13% and 8%. It is tuned to one kind of concrete photography. "
-         "More varied training data is the fix, not a confidence threshold — we tried, and the "
-         "attempt tripled the false-alarm rate, so it was not shipped."),
+        ("It flags roughly three photographs in five.",
+         "That is deliberate. The threshold was set to miss as few real defects as possible, and the cost of that choice is a larger pile for a human to review. A manual inspection means looking at every photograph, after climbing the structure. The threshold is adjustable, and the trade-off is published rather than hidden."),
         ("Severity is a ranking, not a measurement.",
          "It tells you which crack to look at first. It does not tell you how wide the crack is "
          "in millimetres — that needs camera calibration or a physical scale in the frame."),

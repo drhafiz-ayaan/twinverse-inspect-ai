@@ -357,13 +357,13 @@ function dot(slide, x, y, color, size = 0.13) {
 {
   const s = pres.addSlide();
   base(s);
-  eyebrow(s, "The number most teams never check");
-  title(s, "Then we tested it on three datasets\nit had never seen.", 0.98, { h: 1.5, fontSize: 32 });
+  eyebrow(s, "The trade-off most teams never price");
+  title(s, "We picked the threshold by simulating\nan inspection, not by tuning a metric.", 0.98, { h: 1.5, fontSize: 30 });
 
   s.addText(
-    "Every accuracy figure above came from our own dataset's held-out split — different photographs, "
-    + "but the same cameras and the same walls. So we ran it against three public datasets from "
-    + "unrelated sources, none of which contributed anything to training.",
+    "A missed crack is found at the next survey, or when something fails. A false alarm costs an "
+    + "engineer thirty seconds. So we stopped optimising a metric that treats them as equal, "
+    + "simulated 500-photograph surveys, and chose the threshold from a recall target.",
     { x: M, y: 2.32, w: 11.6, h: 0.8, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 13.5, color: MUTED, lineSpacingMultiple: 1.1 },
   );
@@ -376,14 +376,17 @@ function dot(slide, x, y, color, size = 0.13) {
       // judge to ask "which dataset?" finds the other two.
       {
         name: "Cracks found",
-        labels: ["nitw-crack\n(ours)", "crack-bphdr", "bridge-defect", "crack-b"],
-        values: [0.813, 0.634, 0.126, 0.077],
+        labels: ["crack-b", "crack-bphdr", "nitw-crack", "bridge-defect\n(unseen)"],
+        values: [1.00, 0.982, 0.838, 0.558],
       },
     ],
     {
       x: M, y: 3.3, w: 7.2, h: 2.75,
       barDir: "col", barGapWidthPct: 55,
-      chartColors: [CYAN, DIM, DIM, DIM],
+      // Cyan marks bridge-defect, the only wholly unseen source and the
+      // weakest bar. Highlighting the 100% instead would be the same
+      // cherry-pick this slide exists to avoid.
+      chartColors: [DIM, DIM, DIM, CYAN],
       varyColors: true,
       showTitle: false, showLegend: false,
       showValue: true, dataLabelPosition: "outEnd", dataLabelColor: TEXT,
@@ -402,16 +405,16 @@ function dot(slide, x, y, color, size = 0.13) {
     fontFace: B, fontSize: 15, bold: true, color: TEXT,
   });
   s.addText(
-    "Four in five cracks on imagery like our training set. On three we had never seen, between "
-    + "63% and 8%.\n\n"
-    + "We could have shown you only the 63%. We are showing you all four, because the honest "
-    + "claim is that this is tuned to one kind of concrete photography.",
+    "Worst case across four datasets: 84% of cracks found. The previous model could not reach "
+    + "80% on crack-b at any threshold — its best was 35%.\n\n"
+    + "The cost is that we flag 60% of photographs for review. A manual survey means looking at "
+    + "all of them, after climbing the structure.",
     { x: M + 7.9, y: 3.95, w: 3.6, h: 2.0, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 11.5, color: MUTED, lineSpacingMultiple: 1.12 },
   );
 
   s.addText(
-    "We would rather tell you this than have you find it.",
+    "Recall is a safety decision. Review time is a budget. We priced both.",
     { x: M, y: 6.4, w: 11.8, h: 0.4, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 14, italic: true, color: CYAN, align: "center" },
   );
@@ -486,8 +489,8 @@ function dot(slide, x, y, color, size = 0.13) {
 
   const limits = [
     ["Cracks only", "One defect class. It has never seen corrosion or spalling and will not report them."],
-    ["1 in 5 clean surfaces flagged", "Measured against 94 defect-free photographs. It errs toward flagging."],
-    ["8-63% on unfamiliar imagery", "Versus 81% on imagery like its training data. Three unseen datasets, all published."],
+    ["We flag 60% of photographs", "Deliberate. Recall is the safety metric; review time is the cost. The threshold is a slider."],
+    ["56% on the one unseen source", "Versus 84-100% on the three in training. Only bridge-defect is wholly unseen, and we say so."],
     ["Severity is relative", "It ranks which crack to look at first. It does not measure width in millimetres."],
     ["The 3D view is illustrative", "Marker positions come from capture order, not surveyed coordinates."],
     ["Video counts are inflated", "Frames are analysed independently, so one crack can be counted many times."],

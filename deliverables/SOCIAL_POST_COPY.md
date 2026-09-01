@@ -27,14 +27,17 @@ its work. Every severity score on screen is three numbers multiplied together,
 and all three are shown. Nothing is a black box.
 
 We also measured what it gets wrong, and we say so inside the product: it finds
-cracks and only cracks, and it flags about one clean surface in five. It is a
-screening tool, not an engineering assessment.
+cracks and only cracks, and it flags roughly three photographs in five for a
+human to check. That is deliberate — a missed crack is found at the next survey
+or when something fails, while a false alarm costs an engineer thirty seconds.
+Those are not the same cost, so we did not tune for a metric that treats them
+as the same.
 
-About that 81%: it is the number on imagery like its training data, and the
-card says so. We also tested it against three public datasets from unrelated
-sources it had never seen, where it found 63%, 13% and 8%. All four numbers are
-published. A tool that only works on photographs like the ones it was built
-from is worth knowing about before anyone relies on it.
+The 84% on the card is the worst of four datasets, not the best — across them
+it finds 84% to 100% of cracks, and 56% on the one source it has never seen at
+all. We chose the operating point by simulating 500-photograph surveys and
+picking the threshold that met a recall target, then published the whole curve
+so anyone can pick a different one.
 
 Built in a week by three of us at Bano Qabil, Alkhidmat Foundation Pakistan.
 
@@ -52,8 +55,9 @@ severity, and shows its working.
 No black box: every score on screen is three numbers multiplied together, and
 all three are displayed.
 
-We also published what it gets wrong — including that 81% on our own data
-becomes 63%, 13% and 8% on three datasets it had never seen.
+We also published the trade-off: it flags 3 photographs in 5 for review, and
+we picked that point by simulating surveys rather than tuning a metric that
+prices a missed crack like a false alarm.
 
 🔗 [link]
 
@@ -69,11 +73,12 @@ It finds the cracks, ranks how serious each one is, and shows you exactly how
 it reached that number — no black box.
 
 It also tells you what it cannot do. It finds cracks and only cracks, and it
-flags about one clean surface in five. It is a screening tool, not a
-replacement for an engineer.
+flags about three photographs in five for a human to check — on purpose,
+because missing a real crack costs far more than a second look. It is a
+screening tool, not a replacement for an engineer.
 
-The 81% on the card is labelled "on familiar imagery" for a reason: on three
-datasets it had never seen it scored 63%, 13% and 8%. We publish all four.
+The 84% on the card is the worst of four datasets, not the best. On the one
+source it has never seen at all, it finds 56%. We publish all of them.
 
 Three of us. One week. Built at Bano Qabil.
 

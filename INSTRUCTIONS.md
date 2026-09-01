@@ -417,36 +417,53 @@ impressive.
 spalling or missing components and will not report them even if they are in
 frame.
 
-**"About one clean surface in five gets flagged."** Measured against 94
-defect-free photographs. It is a screening tool that errs toward flagging.
+**"It flags about 60% of the photographs you give it."** That is deliberate,
+and it is the most interesting thing about the system. Explain it like this:
 
-**"It is much weaker on imagery unlike its training data — we measured it on
-three other datasets."** This is the strongest thing you can say in the whole
-pitch. Say it deliberately, with the numbers:
+> *"A missed crack gets found at the next survey, or when something fails. A
+> false alarm costs an engineer thirty seconds. Those are not the same cost, so
+> we did not tune for a metric that treats them as the same. We simulated
+> inspection campaigns and picked the threshold from a recall target."*
+
+**The numbers to quote, at the deployed threshold of 0.10:**
 
 | dataset | trained on? | cracks found |
 |---|---|---|
-| nitw-crack | yes | **81%** |
-| crack-bphdr | no | **63%** |
-| bridge-defect | no | **13%** |
-| crack-b | no | **8%** |
+| crack-b | yes | **100%** |
+| crack-bphdr | yes | **98%** |
+| nitw-crack | yes | **84%** |
+| bridge-defect | **no** | **56%** |
 
-Most teams quote the first row and have never run the others. Quoting all four,
-unprompted, is what separates a measured system from a demo.
+**Say the fourth row unprompted.** Three of those datasets are in training;
+only `bridge-defect` is a wholly unseen source, and it is the weakest. It also
+labels a class of "defect" rather than "crack", so some of what it marks is
+outside what this model does at all.
 
-**Do not say "63% on unseen data" and stop there** — that is the best of the
-three unseen numbers, and a judge who asks "which dataset?" will find the other
-two. Say instead: *"On imagery like its training set it finds about four cracks
-in five. On three datasets it had never seen, that ranges from 63% down to 8%.
-It is a screening tool tuned to one kind of concrete photography, and we can
-show you exactly where it stops working."*
+**The one-sentence version of the trade-off:** *"On a 500-photograph survey we
+flag about 300 for a human to look at, and miss roughly 1 real crack in 6 at
+worst. A manual inspection means looking at all 500 — after climbing the
+structure."*
 
-If asked what fixes it: more varied training data, not a threshold. We tried —
-see [D-020](README.md#d-020--three-independent-sources-and-what-that-cost-to-find-out).
-Training on all three sources lifted recall to 79/96/90% but tripled the
-false-positive rate to 65%, and the best repair we found still sat at 27.7%
-against the current 20.2%. That model is in `ml/weights/crack-hardneg.pt` and
-was **not** deployed, on a criterion fixed before the result was known.
+**If a judge says the false-alarm rate is too high**, agree, and show the
+frontier — it is a slider, not a flaw:
+
+```bash
+python ml/simulate_inspection.py --weights ml/weights/crack-hardneg.pt \
+  --defective ml/datasets/_test_crackb \
+  --clean-from-empty-labels ml/datasets/concrete-bridge-defect
+```
+
+It prints recall, defects missed, photographs flagged and review hours at each
+threshold, and names the cheapest threshold meeting a 95%, 90% and 80% recall
+target. Raising the threshold to 0.30 cuts the review pile to 35% of the survey
+and drops worst-case recall to 51%. **That choice belongs to the engineer
+signing the report, not to us** — which is exactly why the tool exists.
+
+**Why we changed models.** The previous checkpoint scored better on the metric
+we were using, and could not reach even 80% recall on `crack-b` at *any*
+threshold — its best was 35%, while flagging 83% of the survey. It was strictly
+worse at every review budget. See
+[D-021](README.md#d-021--separation-was-the-wrong-objective-the-threshold-now-comes-from-a-simulated-survey).
 
 **"Severity is a ranking, not a measurement."** It does not output crack width
 in millimetres — that needs camera calibration or a scale reference in frame.

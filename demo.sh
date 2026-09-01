@@ -36,7 +36,7 @@ EMAIL="${ADMIN_EMAIL:-$(env_value BOOTSTRAP_ADMIN_EMAIL)}"
 PASSWORD="${ADMIN_PASSWORD:-$(env_value BOOTSTRAP_ADMIN_PASSWORD)}"
 COUNT="${1:-8}"
 
-IMAGE_DIR="$HERE/ml/datasets/nitw-crack/test/images"
+IMAGE_DIR="${DEMO_IMAGES:-$HERE/ml/datasets/nitw-crack/test/images}"
 
 command -v jq >/dev/null || { echo "jq is required: sudo apt install -y jq"; exit 1; }
 [ -d "$IMAGE_DIR" ] || { echo "no images at $IMAGE_DIR — fetch a dataset first"; exit 1; }

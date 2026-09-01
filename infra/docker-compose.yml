@@ -78,8 +78,15 @@ services:
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY - generate with python -c "import secrets; print(secrets.token_urlsafe(48))"}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
-      MODEL_WEIGHTS: ${MODEL_WEIGHTS:-yolo11n.pt}
-      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.30}
+      MODEL_WEIGHTS: ${MODEL_WEIGHTS:-/weights/crack-hardneg.pt}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.10}
+      # Severity bands are percentiles of a specific model's output, so they
+      # change whenever the checkpoint does — see README D-018. Passed as
+      # environment rather than left to the image's defaults so recalibrating
+      # is a restart, not a rebuild. Values from ml/calibrate_bands.py.
+      SEVERITY_BAND_MEDIUM: ${SEVERITY_BAND_MEDIUM:-0.0060}
+      SEVERITY_BAND_HIGH: ${SEVERITY_BAND_HIGH:-0.0163}
+      SEVERITY_BAND_CRITICAL: ${SEVERITY_BAND_CRITICAL:-0.1653}
       INFERENCE_DEVICE: ${INFERENCE_DEVICE:-cpu}
     ports:
       - "8000:8000"
