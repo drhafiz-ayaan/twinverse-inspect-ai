@@ -60,6 +60,61 @@ def glide(page, to: int, steps: int = 26) -> None:
         page.wait_for_timeout(22)
 
 
+def _render_social(ffmpeg: str, webm: Path, out: Path, speed: float,
+                   tail_seconds: float, *, square: bool) -> None:
+    """Compose one social aspect: magnified screen recording plus chrome.
+
+    Square (1:1) crops the magnified recording edge to edge. Vertical (9:16)
+    cannot: a 16:9 desktop UI in a 9:16 frame leaves two thirds of the height
+    empty, so the same square crop is inset into a taller canvas and the space
+    above and below carries the wordmark and the numbers. That is a layout, not
+    letterboxing — the empty bars are doing work.
+    """
+    W, H = (1080, 1080) if square else (1080, 1920)
+    inset_y = 0 if square else 430
+
+    chrome = _make_chrome(out.with_name(f"_chrome_{W}x{H}.png"), W, H, inset_y, square)
+    end_card = _make_end_card(out.with_name(f"_end_{W}x{H}.png"), W, H)
+    body = out.with_name(f"_body_{W}x{H}.mp4")
+    tail = out.with_name(f"_tail_{W}x{H}.mp4")
+    listing = out.with_name(f"_concat_{W}x{H}.txt")
+
+    # Magnify and crop rather than letterbox. Fitting 1280x720 into 1080 wide
+    # leaves the UI unreadable on a phone; scaling to 1080 tall and cropping
+    # 1080 wide gives 1.5x on the content column. The x offset keeps that column
+    # in frame — the dashboard content sits left of centre in a max-width
+    # container, so a centred crop clipped the headline.
+    crop = f"setpts=PTS/{speed:.4f},scale=-2:1080,crop=1080:1080:36:0"
+    graph = (f"[0:v]{crop}[v];"
+             f"color=c=0x070B14:s={W}x{H}[bg];"
+             f"[bg][v]overlay=0:{inset_y}:shortest=1[framed];"
+             f"[framed][1:v]overlay=0:0[out]")
+
+    subprocess.run(
+        [ffmpeg, "-y", "-i", str(webm), "-i", str(chrome),
+         "-filter_complex", graph, "-map", "[out]",
+         "-c:v", "libx264", "-preset", "slow", "-crf", "20",
+         "-pix_fmt", "yuv420p", "-r", "25", str(body)],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        [ffmpeg, "-y", "-loop", "1", "-t", str(tail_seconds), "-i", str(end_card),
+         "-c:v", "libx264", "-preset", "slow", "-crf", "20",
+         "-pix_fmt", "yuv420p", "-r", "25", "-vf", f"scale={W}:{H}", str(tail)],
+        check=True, capture_output=True,
+    )
+    # Concat demuxer refuses streams that differ, so both were encoded with
+    # identical parameters above.
+    listing.write_text(f"file '{body.name}'\nfile '{tail.name}'\n")
+    subprocess.run(
+        [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+         "-c", "copy", "-movflags", "+faststart", str(out)],
+        check=True, capture_output=True, cwd=str(out.parent),
+    )
+    for tmp in (body, tail, listing, chrome, end_card):
+        tmp.unlink(missing_ok=True)
+
+
 def _duration(ffmpeg: str, path: Path) -> float:
     """Seconds, parsed from ffmpeg's own report — ffprobe is not bundled."""
     import re
@@ -89,37 +144,77 @@ def _font(kind: str, size: int):
         else ImageFont.load_default()
 
 
-def _make_title_bar(path: Path) -> Path:
-    """Transparent strip laid over the top band of the square crop."""
+def _make_chrome(path: Path, w: int, h: int, inset_y: int, square: bool) -> Path:
+    """Wordmark and supporting text, composited over the framed recording.
+
+    Social autoplays muted, so the frame has to say what it is without a
+    caption. On the square this is a band across the top of live UI; on the
+    vertical there is real space above and below the video, so the same
+    information can breathe and the numbers go in the footer.
+    """
     from PIL import Image, ImageDraw
 
-    img = Image.new("RGBA", (1080, 1080), (0, 0, 0, 0))
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # Solid band: the cropped frame is live UI edge to edge, so text laid
-    # straight over it is unreadable half the time.
-    d.rectangle([0, 0, 1080, 104], fill=(*BG, 236))
-    d.text((40, 22), "TwinVerse Inspect AI", font=_font("bold", 36), fill=(*TEXT, 255))
-    d.text((40, 66), "Finds structural cracks from a photograph.",
-           font=_font("regular", 23), fill=(*CYAN, 255))
+
+    if square:
+        # Laid over live UI, so it needs an opaque band or it is unreadable
+        # half the time.
+        d.rectangle([0, 0, w, 104], fill=(*BG, 236))
+        d.text((40, 22), "TwinVerse Inspect AI", font=_font("bold", 36), fill=(*TEXT, 255))
+        d.text((40, 66), "Finds structural cracks from a photograph.",
+               font=_font("regular", 23), fill=(*CYAN, 255))
+        return img.save(path) or path
+
+    # --- vertical: header above the video, numbers below --------------------
+    d.text((64, 150), "A U T O N O M O U S   S C R E E N I N G",
+           font=_font("bold", 22), fill=(*CYAN, 255))
+    d.text((64, 200), "TwinVerse", font=_font("bold", 76), fill=(*TEXT, 255))
+    d.text((64, 284), "Inspect AI", font=_font("bold", 76), fill=(*CYAN, 255))
+    d.text((64, 386), "Finds structural cracks from a photograph.",
+           font=_font("regular", 30), fill=(*MUTED, 255))
+
+    foot = inset_y + 1080 + 70
+    d.text((64, foot), "Every severity score shows its own arithmetic.",
+           font=_font("bold", 32), fill=(*TEXT, 255))
+    # The worst of four datasets, matching the printed cards. A vertical clip
+    # is the easiest place to quietly quote the best one instead.
+    d.text((64, foot + 58), "84% of cracks found — worst of four datasets",
+           font=_font("regular", 27), fill=(*MUTED, 255))
+
+    x = 64
+    for label, colour in (("low", (16, 185, 129)), ("medium", (245, 158, 11)),
+                          ("high", (249, 115, 22)), ("critical", (244, 63, 94))):
+        d.ellipse([x, foot + 132, x + 16, foot + 148], fill=(*colour, 255))
+        d.text((x + 28, foot + 126), label, font=_font("regular", 25),
+               fill=(*MUTED, 255))
+        x += int(d.textlength(label, font=_font("regular", 25))) + 92
+
+    d.text((64, foot + 200), "Ayaan Aatif · Muhammad Muneed · Inshrah Mehmood",
+           font=_font("bold", 26), fill=(*MUTED, 255))
     img.save(path)
     return path
 
 
-def _make_end_card(path: Path) -> Path:
+def _make_end_card(path: Path, w: int = 1080, h: int = 1080) -> Path:
+    """Closing frame. Anchored to the frame centre so one layout serves both
+    the 1:1 and the 9:16 crop."""
     from PIL import Image, ImageDraw
 
-    img = Image.new("RGB", (1080, 1080), BG)
+    img = Image.new("RGB", (w, h), BG)
     d = ImageDraw.Draw(img)
-    d.text((70, 300), "TwinVerse", font=_font("bold", 78), fill=TEXT)
-    d.text((70, 386), "Inspect AI", font=_font("bold", 78), fill=CYAN)
-    d.text((70, 512), "Inspect the unreachable.", font=_font("regular", 34), fill=MUTED)
-    # The number is the worst of four datasets, matching the cards. A social
-    # clip is the easiest place to quietly quote the best one instead.
-    d.text((70, 604), "84% of cracks found — worst of four datasets",
+    top = h // 2 - 240
+    d.text((70, top), "TwinVerse", font=_font("bold", 78), fill=TEXT)
+    d.text((70, top + 86), "Inspect AI", font=_font("bold", 78), fill=CYAN)
+    d.text((70, top + 212), "Inspect the unreachable.",
+           font=_font("regular", 34), fill=MUTED)
+    # The worst of four datasets, matching the printed cards. A short clip is
+    # the easiest place to quietly quote the flattering number instead.
+    d.text((70, top + 304), "84% of cracks found — worst of four datasets",
            font=_font("regular", 25), fill=MUTED)
-    d.text((70, 646), "Every severity score shows its own arithmetic",
+    d.text((70, top + 346), "Every severity score shows its own arithmetic",
            font=_font("regular", 25), fill=MUTED)
-    d.text((70, 830), "Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood",
+    d.text((70, top + 530), "Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood",
            font=_font("bold", 26), fill=MUTED)
     img.save(path)
     return path
@@ -294,59 +389,23 @@ def main() -> int:
 
     if ffmpeg:
         if short:
-            # Square, for a feed. A 16:9 screen recording letterboxed into 1:1
-            # wastes half the frame, so the recording is scaled to full width
-            # and the remaining space carries a title bar and an end card —
-            # social autoplays muted, so the frame has to say what this is.
-            # Land on 30 seconds exactly. The raw run varies by a few seconds
-            # because real inference does, so the speed-up is computed from the
-            # measured duration rather than hardcoded. Roughly 1.15x, which is
-            # imperceptible on UI motion — and the full-length recording keeps
-            # the honest timing, including the unedited inference wait.
+            # Land on 30 seconds. The raw run varies by a few seconds because
+            # real inference does, so the speed-up is computed from the measured
+            # duration rather than hardcoded — and it is often 1.00x, leaving
+            # the timing untouched. The full-length recording always keeps the
+            # honest timing, including the unedited inference wait.
             TARGET, TAIL = 30.0, 2.5
             measured = _duration(ffmpeg, webm)
             speed = max(1.0, measured / (TARGET - TAIL)) if measured else 1.0
             print(f"  raw {measured:.1f}s -> {speed:.2f}x to hit {TARGET:.0f}s")
 
-            end_card = _make_end_card(HERE / "_endcard.png")
-            title_bar = _make_title_bar(HERE / "_titlebar.png")
-            body = HERE / "_body.mp4"
-            subprocess.run(
-                [ffmpeg, "-y", "-i", str(webm), "-i", str(title_bar),
-                 "-filter_complex",
-                 # Magnify and crop rather than letterbox. Fitting a 1280x720
-                 # desktop UI into a 1080 square leaves the text unreadable on a
-                 # phone and wastes a third of the frame on bars. Scaling to
-                 # 1080 tall and cropping 1080 wide gives 1.5x on the content
-                 # column; the x offset keeps that column in frame, since the
-                 # dashboard's content is left-of-centre in a max-width
-                 # container rather than spread across the viewport.
-                 f"[0:v]setpts=PTS/{speed:.4f},scale=-2:1080,crop=1080:1080:36:0[v];"
-                 "[v][1:v]overlay=0:0[out]",
-                 "-map", "[out]",
-                 "-c:v", "libx264", "-preset", "slow", "-crf", "20",
-                 "-pix_fmt", "yuv420p", "-r", "25", str(body)],
-                check=True, capture_output=True,
-            )
-            # 2.5s end card, concatenated by re-encoding both to identical
-            # parameters — the concat demuxer refuses streams that differ.
-            tail = HERE / "_tail.mp4"
-            subprocess.run(
-                [ffmpeg, "-y", "-loop", "1", "-t", "2.5", "-i", str(end_card),
-                 "-c:v", "libx264", "-preset", "slow", "-crf", "20",
-                 "-pix_fmt", "yuv420p", "-r", "25", "-vf", "scale=1080:1080",
-                 str(tail)],
-                check=True, capture_output=True,
-            )
-            listing = HERE / "_concat.txt"
-            listing.write_text(f"file '{body.name}'\nfile '{tail.name}'\n")
-            subprocess.run(
-                [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-                 "-c", "copy", "-movflags", "+faststart", str(out_mp4)],
-                check=True, capture_output=True, cwd=str(HERE),
-            )
-            for tmp in (body, tail, listing, end_card, title_bar):
-                tmp.unlink(missing_ok=True)
+            # Both aspects come from the same recording. Rendering them from
+            # separate runs would let the square and the vertical drift apart —
+            # different detections, different counts, same claimed product.
+            _render_social(ffmpeg, webm, out_mp4, speed, TAIL, square=True)
+            vertical = out_mp4.with_name("demo_social_30s_vertical.mp4")
+            _render_social(ffmpeg, webm, vertical, speed, TAIL, square=False)
+            print(f"wrote {vertical}  ({vertical.stat().st_size / 1e6:.1f} MB)")
         else:
             subprocess.run(
                 [ffmpeg, "-y", "-i", str(webm),

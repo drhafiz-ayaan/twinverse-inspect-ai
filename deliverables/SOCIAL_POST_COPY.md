@@ -4,14 +4,19 @@ Two images are in this folder — pick by platform:
 
 | File | Size | Use for |
 |---|---|---|
-| `demo_social_30s.mp4` | 1080 × 1080, 30s | **Lead with this.** Instagram, LinkedIn, TikTok — video outperforms a static card everywhere |
+| `demo_social_30s.mp4` | 1080 × 1080, 30s | **Lead with this.** Instagram and LinkedIn feed, Facebook |
+| `demo_social_30s_vertical.mp4` | 1080 × 1920, 30s | Reels, TikTok, Shorts, Stories |
 | `social_square_1080.jpg` | 1080 × 1080 | Instagram, LinkedIn, Facebook |
 | `social_landscape_1200x630.jpg` | 1200 × 630 | X/Twitter, LinkedIn link preview |
 | `demo_backup.mp4` | 1280 × 720, 70s | Not for social — the presentation backup, with the full unedited inference wait |
 
-The 30-second cut is silent and autoplays muted, which is why the wordmark and
-the tagline are burned into the frame rather than left to the caption.
-Regenerate it against the current build with:
+Both 30-second cuts are silent and autoplay muted, which is why the wordmark,
+the tagline and the accuracy figure are burned into the frame rather than left
+to the caption. They are rendered from a **single recording**, so the square and
+the vertical always show the same run — rendering them separately would let two
+different sets of detections circulate as the same product.
+
+Regenerate both against the current build with one command:
 
 ```bash
 python deliverables/record_demo.py --short
