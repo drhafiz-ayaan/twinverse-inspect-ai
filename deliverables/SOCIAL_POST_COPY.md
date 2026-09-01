@@ -4,8 +4,18 @@ Two images are in this folder — pick by platform:
 
 | File | Size | Use for |
 |---|---|---|
+| `demo_social_30s.mp4` | 1080 × 1080, 30s | **Lead with this.** Instagram, LinkedIn, TikTok — video outperforms a static card everywhere |
 | `social_square_1080.jpg` | 1080 × 1080 | Instagram, LinkedIn, Facebook |
 | `social_landscape_1200x630.jpg` | 1200 × 630 | X/Twitter, LinkedIn link preview |
+| `demo_backup.mp4` | 1280 × 720, 70s | Not for social — the presentation backup, with the full unedited inference wait |
+
+The 30-second cut is silent and autoplays muted, which is why the wordmark and
+the tagline are burned into the frame rather than left to the caption.
+Regenerate it against the current build with:
+
+```bash
+python deliverables/record_demo.py --short
+```
 
 ---
 

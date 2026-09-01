@@ -45,7 +45,9 @@ runs/
 # thing you play when the live demo fails, so it belongs in the repo. The
 # intermediate .webm does not; regenerate both with record_demo.py.
 !deliverables/demo_backup.mp4
+!deliverables/demo_social_30s.mp4
 deliverables/demo_backup.webm
+deliverables/demo_social_30s.webm
 deliverables/_video_raw/
 
 # OS / editor
