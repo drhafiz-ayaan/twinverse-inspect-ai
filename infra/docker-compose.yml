@@ -108,7 +108,15 @@ services:
     build:
       context: ../frontend
       args:
+        # Baked in at build time, and correct for the *browser*: the API is
+        # published on the host at this address.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    environment:
+      # The address the dashboard *server* uses, which is not the same one.
+      # All data fetching and every proxy route in this app run server-side,
+      # and inside this container "localhost" is the container itself — so
+      # without this, signing in returns 502 while the page still renders 200.
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000/api/v1}
     ports:
       - "3000:3000"
     depends_on:

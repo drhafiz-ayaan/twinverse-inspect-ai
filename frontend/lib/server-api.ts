@@ -2,7 +2,6 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import {
-  API_BASE,
   type Asset,
   type Detection,
   type DetectionSummary,
@@ -11,6 +10,7 @@ import {
   type MediaFile,
   type SeverityModel,
 } from "@/lib/api";
+import { API_INTERNAL_BASE } from "@/lib/server-config";
 
 /**
  * Server-side API client.
@@ -33,7 +33,7 @@ export class UnauthorizedError extends Error {
 
 async function get<T>(path: string): Promise<T> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_INTERNAL_BASE}${path}`, {
     cache: "no-store",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

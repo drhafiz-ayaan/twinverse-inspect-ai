@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { API_BASE } from "@/lib/api";
+import { API_INTERNAL_BASE } from "@/lib/server-config";
 import { SESSION_COOKIE } from "@/lib/server-api";
 
 /**
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${API_BASE}/auth/login`, {
+    upstream = await fetch(`${API_INTERNAL_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),

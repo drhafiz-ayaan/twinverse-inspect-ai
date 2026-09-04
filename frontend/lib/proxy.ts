@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { API_BASE } from "@/lib/api";
+import { API_INTERNAL_BASE } from "@/lib/server-config";
 import { SESSION_COOKIE } from "@/lib/server-api";
 
 /**
@@ -40,7 +40,7 @@ export async function forward(
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${API_BASE}${path}`, {
+    upstream = await fetch(`${API_INTERNAL_BASE}${path}`, {
       ...init,
       headers: { ...auth, ...(init.headers ?? {}) },
       cache: "no-store",
