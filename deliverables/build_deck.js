@@ -125,7 +125,7 @@ function dot(slide, x, y, color, size = 0.13) {
       });
     });
 
-  s.addText("[ Event / Track ]   ·   [ Date ]   ·   Bano Qabil · Alkhidmat Foundation Pakistan", {
+  s.addText("Alibaba Cloud AI Hackathon Pakistan 2026   ·   Bano Qabil · Alkhidmat Foundation Pakistan", {
     x: M, y: 6.62, w: 11.8, h: 0.3, isTextBox: true, margin: 0,
     fontFace: B, fontSize: 11, color: DIM,
   });
@@ -467,11 +467,11 @@ function dot(slide, x, y, color, size = 0.13) {
     });
   });
 
-  s.addText(
-    "[ Replace this line with a screenshot of the dashboard and the 3D viewer ]",
-    { x: M, y: 6.25, w: 11.8, h: 0.35, isTextBox: true, margin: 0,
-      fontFace: B, fontSize: 11.5, italic: true, color: DIM, align: "center" },
-  );
+  // A real capture of the running dashboard, not a mock. Regenerate with
+  // capture_dashboard.py --selector main.
+  // Pre-cropped to the slot's own aspect ratio, so it neither stretches nor
+  // runs off the bottom of the slide.
+  s.addImage({ path: "deck_dashboard.jpg", x: M, y: 6.05, w: 11.8, h: 1.25 });
   s.addNotes("Orbit the viewer live if the demo is working. Then immediately state what it is not.");
 }
 
@@ -574,8 +574,8 @@ function dot(slide, x, y, color, size = 0.13) {
 
   const team = [
     ["Ayaan Aatif", "Team Lead", "Architecture, ML pipeline, demo delivery", CYAN],
-    ["Muhammad Muneed", "Team Member", "[ Add focus area ]", INDIGO],
-    ["Inshrah Mehmood", "Team Member", "[ Add focus area ]", VIOLET],
+    ["Muhammad Muneed", "Team Member", "", INDIGO],
+    ["Inshrah Mehmood", "Team Member", "", VIOLET],
   ];
   team.forEach(([name, role, focus, c], i) => {
     const x = M + i * 4.0;
