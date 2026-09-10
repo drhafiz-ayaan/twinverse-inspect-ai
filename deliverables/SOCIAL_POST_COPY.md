@@ -56,7 +56,7 @@ so anyone can pick a different one.
 
 Built in a week by three of us at Bano Qabil, Alkhidmat Foundation Pakistan.
 
-Ayaan Aatif · Muhammad Muneed · Inshrah Mehmood
+Ayaan Aatif · Muhammad Muneeb · Inshrah Mehmood
 
 #AI #ComputerVision #Infrastructure #CivilEngineering #MachineLearning #BanoQabil
 
@@ -97,7 +97,7 @@ source it has never seen at all, it finds 56%. We publish all of them.
 
 Three of us. One week. Built at Bano Qabil.
 
-Ayaan Aatif · Muhammad Muneed · Inshrah Mehmood
+Ayaan Aatif · Muhammad Muneeb · Inshrah Mehmood
 
 #AI #ComputerVision #CivilEngineering #Infrastructure #BanoQabil #Pakistan #MachineLearning #Innovation
 

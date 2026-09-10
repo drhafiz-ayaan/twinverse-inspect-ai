@@ -214,7 +214,7 @@ def build(w: int, h: int, name: str, *, compact: bool):
 
     cf = font("bold", int(unit * 0.0215))
     d.text((pad, ly + int(unit * 0.052)),
-           "Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood",
+           "Ayaan Aatif  ·  Muhammad Muneeb  ·  Inshrah Mehmood",
            font=cf, fill=MUTED)
 
     out = OUT / name

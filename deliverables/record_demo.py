@@ -190,7 +190,7 @@ def _make_chrome(path: Path, w: int, h: int, inset_y: int, square: bool) -> Path
                fill=(*MUTED, 255))
         x += int(d.textlength(label, font=_font("regular", 25))) + 92
 
-    d.text((64, foot + 200), "Ayaan Aatif · Muhammad Muneed · Inshrah Mehmood",
+    d.text((64, foot + 200), "Ayaan Aatif · Muhammad Muneeb · Inshrah Mehmood",
            font=_font("bold", 26), fill=(*MUTED, 255))
     img.save(path)
     return path
@@ -214,7 +214,7 @@ def _make_end_card(path: Path, w: int = 1080, h: int = 1080) -> Path:
            font=_font("regular", 25), fill=MUTED)
     d.text((70, top + 346), "Every severity score shows its own arithmetic",
            font=_font("regular", 25), fill=MUTED)
-    d.text((70, top + 530), "Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood",
+    d.text((70, top + 530), "Ayaan Aatif  ·  Muhammad Muneeb  ·  Inshrah Mehmood",
            font=_font("bold", 26), fill=MUTED)
     img.save(path)
     return path

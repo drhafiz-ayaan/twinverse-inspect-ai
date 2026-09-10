@@ -531,8 +531,8 @@ ss -ltnp | grep -E ':(3000|8000)'
 | | Name | Focus |
 |---|---|---|
 | **Lead** | Ayaan Aatif | Architecture, ML pipeline, demo delivery |
-| **Team** | Muhammad Muneed | *[fill in]* |
-| **Team** | Inshrah Mehmood | *[fill in]* |
+| **Team** | Muhammad Muneeb | Backend, data and API |
+| **Team** | Inshrah Mehmood | Marketing and outreach |
 
 **Before the presentation:**
 

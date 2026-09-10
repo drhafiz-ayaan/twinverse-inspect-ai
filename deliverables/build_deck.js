@@ -111,7 +111,7 @@ function dot(slide, x, y, color, size = 0.13) {
       fontFace: B, fontSize: 15, color: MUTED },
   );
 
-  [["Ayaan Aatif", "Team Lead"], ["Muhammad Muneed", "Team Member"], ["Inshrah Mehmood", "Team Member"]]
+  [["Ayaan Aatif", "Team Lead"], ["Muhammad Muneeb", "Backend, Data & API"], ["Inshrah Mehmood", "Marketing & Outreach"]]
     .forEach(([name, role], i) => {
       const x = M + i * 3.5;
       dot(s, x, 5.52, [CYAN, INDIGO, VIOLET][i], 0.11);
@@ -574,8 +574,8 @@ function dot(slide, x, y, color, size = 0.13) {
 
   const team = [
     ["Ayaan Aatif", "Team Lead", "Architecture, ML pipeline, demo delivery", CYAN],
-    ["Muhammad Muneed", "Team Member", "", INDIGO],
-    ["Inshrah Mehmood", "Team Member", "", VIOLET],
+    ["Muhammad Muneeb", "Backend, Data & API", "Services, database and the upload pipeline", INDIGO],
+    ["Inshrah Mehmood", "Marketing & Outreach", "Positioning, launch material and the pitch", VIOLET],
   ];
   team.forEach(([name, role, focus, c], i) => {
     const x = M + i * 4.0;
@@ -674,7 +674,7 @@ function dot(slide, x, y, color, size = 0.13) {
     x: M, y: 5.15, w: 11.8, h: 0.45, isTextBox: true, margin: 0,
     fontFace: H, fontSize: 22, bold: true, color: TEXT, align: "center",
   });
-  s.addText("Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood", {
+  s.addText("Ayaan Aatif  ·  Muhammad Muneeb  ·  Inshrah Mehmood", {
     x: M, y: 5.65, w: 11.8, h: 0.35, isTextBox: true, margin: 0,
     fontFace: B, fontSize: 14, color: MUTED, align: "center",
   });

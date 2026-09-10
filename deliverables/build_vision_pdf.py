@@ -132,7 +132,7 @@ def cover_page(canvas: pdfcanvas.Canvas, doc):
 
     canvas.setFillColor(colors.HexColor("#E8EEF8"))
     canvas.setFont("Helvetica-Bold", 11)
-    canvas.drawString(MARGIN, 120, "Ayaan Aatif  ·  Muhammad Muneed  ·  Inshrah Mehmood")
+    canvas.drawString(MARGIN, 120, "Ayaan Aatif  ·  Muhammad Muneeb  ·  Inshrah Mehmood")
     canvas.setFillColor(colors.HexColor("#64748B"))
     canvas.setFont("Helvetica", 9)
     canvas.drawString(MARGIN, 104, "[ Event / Track ]   ·   [ Date ]   ·   Bano Qabil · Alkhidmat Foundation Pakistan")
@@ -182,8 +182,8 @@ def closing_page(canvas: pdfcanvas.Canvas, doc):
     # Team, spaced across the lower third.
     team = [
         ("Ayaan Aatif", "Team Lead", CYAN),
-        ("Muhammad Muneed", "Team Member", INDIGO),
-        ("Inshrah Mehmood", "Team Member", VIOLET),
+        ("Muhammad Muneeb", "Backend, Data & API", INDIGO),
+        ("Inshrah Mehmood", "Marketing & Outreach", VIOLET),
     ]
     col = (PW - 2 * MARGIN) / 3
     for i, (name, role, accent) in enumerate(team):
@@ -286,7 +286,7 @@ def build():
         leftMargin=MARGIN, rightMargin=MARGIN,
         topMargin=MARGIN + 22, bottomMargin=MARGIN + 12,
         title="TwinVerse Inspect AI — What we built",
-        author="Ayaan Aatif, Muhammad Muneed, Inshrah Mehmood",
+        author="Ayaan Aatif, Muhammad Muneeb, Inshrah Mehmood",
         subject="AI-powered infrastructure inspection",
     )
     frame = Frame(MARGIN, MARGIN + 12, PW - 2 * MARGIN,
