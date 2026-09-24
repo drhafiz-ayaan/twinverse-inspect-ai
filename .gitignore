@@ -44,10 +44,13 @@ runs/
 # The backup demo video is a deliverable, not incidental media — it is the
 # thing you play when the live demo fails, so it belongs in the repo. The
 # intermediate .webm does not; regenerate both with record_demo.py.
-!deliverables/demo_backup.mp4
-!deliverables/demo_social_30s.mp4
-deliverables/demo_backup.webm
-deliverables/demo_social_30s.webm
+# Every mp4 under deliverables/ is a deliverable, so allow the directory rather
+# than naming files one at a time. The per-file form silently dropped
+# demo_social_30s_vertical.mp4: git add -A reported nothing to commit, the
+# working tree looked clean, and the file was absent from the repo while being
+# described as pushed.
+!deliverables/*.mp4
+deliverables/*.webm
 deliverables/_video_raw/
 
 # OS / editor
