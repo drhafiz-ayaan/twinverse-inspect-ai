@@ -475,6 +475,63 @@ function dot(slide, x, y, color, size = 0.13) {
   s.addNotes("Orbit the viewer live if the demo is working. Then immediately state what it is not.");
 }
 
+
+// ============================================ 7b. SIMULATION / DIGITAL TWIN
+{
+  const s = pres.addSlide();
+  base(s);
+  eyebrow(s, "Validation nobody else can run");
+  title(s, "We built a bridge where we already know\nwhere every crack is.", 0.98, { h: 1.5, fontSize: 31 });
+
+  s.addText(
+    "A real crack photograph does not record how far away the camera was, or where the crack is in "
+    + "space. So we generated a bridge in Gazebo with cracks cut from real photographs and placed at "
+    + "known 3D positions, and flew a simulated drone over it — into the same upload endpoint a real "
+    + "drone would use.",
+    { x: M, y: 2.34, w: 11.6, h: 0.9, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 13.5, color: MUTED, lineSpacingMultiple: 1.1 },
+  );
+
+  const facts = [
+    ["1.2 - 3.5 m", "Working standoff envelope", "Measured, not guessed. Beyond 5 m a crack is too few pixels; at 0.8 m it overflows the frame and returns nothing.", CYAN],
+    ["60%", "Survey recall on known cracks", "11 frames, 5 cracks photographed, 3 found — scored against positions the world knows exactly.", INDIGO],
+    ["0.71 px", "Camera calibration error", "Projection convention measured from rendered markers, not derived. The derivation was wrong twice.", VIOLET],
+  ];
+  facts.forEach(([big, label, body, c], i) => {
+    const x = M + i * 4.03;
+    card(s, x, 3.42, 3.75, 2.15);
+    s.addText(big, {
+      x: x + 0.26, y: 3.62, w: 3.3, h: 0.55, isTextBox: true, margin: 0,
+      fontFace: H, fontSize: 27, bold: true, color: c,
+    });
+    s.addText(label, {
+      x: x + 0.26, y: 4.18, w: 3.3, h: 0.3, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 12.5, bold: true, color: TEXT,
+    });
+    s.addText(body, {
+      x: x + 0.26, y: 4.52, w: 3.32, h: 0.95, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 10.5, color: MUTED, lineSpacingMultiple: 1.05,
+    });
+  });
+
+  s.addText(
+    "The two cracks it missed were the largest and the best-centred. Size does not predict detectability — contrast does.",
+    { x: M, y: 5.82, w: 11.8, h: 0.4, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 14, italic: true, color: CYAN, align: "center" },
+  );
+  s.addText(
+    "Play sim_survey.mp4 here — the drone's view with detections and known cracks side by side.",
+    { x: M, y: 6.32, w: 11.8, h: 0.35, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 11.5, italic: true, color: DIM, align: "center" },
+  );
+  s.addNotes(
+    "This is the slide that separates the project from an MVP. The claim is not that the "
+    + "simulation is realistic — it is that it has ground truth, which no public dataset does. "
+    + "Say the missed-cracks finding out loud: the two it missed were the biggest and the most "
+    + "centrally framed, so 'we will certainly catch the big ones' is not supported.",
+  );
+}
+
 // ============================================================ 8. HONESTY
 {
   const s = pres.addSlide();
@@ -556,7 +613,7 @@ function dot(slide, x, y, color, size = 0.13) {
     fontFace: B, fontSize: 14.5, bold: true, color: TEXT,
   });
   s.addText(
-    "20 architectural decisions are written down with their reasoning — including the ones we got wrong, and one we had to publicly reverse after re-checking it.\n\n" +
+    "21 architectural decisions are written down with their reasoning — including the ones we got wrong, and one we had to publicly reverse after re-checking it.\n\n" +
     "A dataset that looked ideal and turned out unusable. A merge that made the model worse. A metric that hid a failure for an hour.\n\n" +
     "All of it is in the repository.",
     { x: M + 7.9, y: 3.1, w: 3.6, h: 3.1, isTextBox: true, margin: 0,
@@ -619,7 +676,7 @@ function dot(slide, x, y, color, size = 0.13) {
   title(s, "The honest roadmap.");
 
   const now = ["Crack detection, measured on unseen data", "Severity scoring and PDF reports",
-               "Dashboard, 3D viewer, auth, Docker"];
+               "Simulated survey validated on known ground truth"];
   const next = ["Varied training data to close the 63/81 gap", "More defect classes — corrosion, spalling",
                 "Cross-frame tracking so video counts are real"];
   const later = ["Photogrammetric twin from the imagery itself",
